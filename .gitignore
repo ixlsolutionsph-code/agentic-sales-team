@@ -1,2 +1,10 @@
 .DS_Store
 __MACOSX/
+node_modules/
+.next/
+out/
+.env.local
+.env*.local
+.claude/
+*.tsbuildinfo
+next-env.d.ts
