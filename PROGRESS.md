@@ -6,22 +6,23 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
 
 - **Milestone 1: landing page.** Uses the Spectrum look in `DESIGN.md` (not the blue in `01-prd.md` §10).
   The "Trusted by 1,200+ sales teams" badge was removed at the owner's request.
-- **Milestone 2: code is written and tested on a local Postgres stand-in.** All checks in
-  `05-build-guide.md` M2 passed locally.
+- **Milestone 2: done on Neon.** Tables made with `pnpm db:migrate` (second run applied nothing).
+  All `05-build-guide.md` M2 checks passed in a browser against Neon on 2026-11-24, then the test
+  account and its rate-limit rows were deleted (the database has 0 users now).
+  The guide says "19 tables", but `04-erd.md` lists 20; the database has all 20 plus `_migrations`.
 
-## Milestone 2: what is left
+## Next
 
-1. Connect to the owner's Neon database (Singapore, `ap-southeast-1`).
-   - Use the cloud environment **agentic-sales-team**. It allows `api.ap-southeast-1.aws.neon.tech`
-     and holds `DATABASE_URL` as an environment variable (the owner entered it; never print it).
-2. Make `.env.local` (it is not in git) with a fresh `AUTH_SECRET`:
-   `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
-   Do not put `DATABASE_URL` in it; it comes from the environment.
-3. Run `pnpm db:migrate` against Neon, then run it again (second run must apply nothing).
-4. Run the M2 checks against Neon (sign up, log out, log in, old cookie rejected, duplicate
-   sign-up message, 6th wrong password blocked, 10-workspace limit, forged `ws` cookie ignored,
-   `/dashboard` redirects when signed out). Then delete the test account rows.
-5. Report to the owner in the `AGENTS.md` format, then wait before Milestone 3.
+- Milestone 3, once the owner says go.
+
+## Working in the cloud session
+
+- Use the cloud environment **agentic-sales-team**. It holds `DATABASE_URL` (never print it) and allows
+  `api.c-5.ap-southeast-1.aws.neon.tech`, the address the Neon driver really calls.
+- In this sandbox, Node needs `NODE_USE_ENV_PROXY=1` to reach Neon (for `pnpm db:migrate`, `pnpm dev`,
+  `pnpm start`). This is only for the sandbox, not for Vercel.
+- `.env.local` is not in git. If it is missing, make it with a fresh `AUTH_SECRET`:
+  `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
 
 ## Notes
 
