@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import { HERO_EMAIL_ERROR, isValidEmail } from "@/lib/landing";
 import HeroDemo from "./HeroDemo";
@@ -41,14 +40,6 @@ export default function Hero({
               <span className="lp-label">{s.label}</span>
             </span>
           ))}
-        </div>
-        <div className="lp-trust" data-hero>
-          <span className="lp-faces" aria-hidden="true">
-            {[1, 2, 3, 4].map((n) => (
-              <Image key={n} src={`/landing/face${n}.jpg`} alt="" width={28} height={28} />
-            ))}
-          </span>
-          <span className="badge">Trusted by 1,200+ sales teams</span>
         </div>
         <h1 className="lp-h1" data-hero>
           An AI sales team that works for you in chat
