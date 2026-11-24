@@ -30,7 +30,7 @@ export const AGENTS: Record<AgentKey, { name: string; role: string; line: string
     role: "Assessor",
     line: "Checks every new lead against your goal and tells you why it fits, in one line.",
     skills: ["Lead assessment", "Research"],
-    wash: "",
+    wash: "wash-peach",
   },
   maya: {
     name: "Maya",
@@ -44,7 +44,7 @@ export const AGENTS: Record<AgentKey, { name: string; role: string; line: string
     role: "Meeting Booker",
     line: "Books the meeting when you say “tomorrow at 2pm”, inside your working hours.",
     skills: ["Meeting booking"],
-    wash: "",
+    wash: "wash-purple",
   },
 };
 

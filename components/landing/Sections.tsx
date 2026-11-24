@@ -7,7 +7,7 @@ type AuthFn = (mode: "login" | "signup") => void;
 function Head({ label, title, text, center }: { label: string; title: string; text?: string; center?: boolean }) {
   return (
     <div className={`lp-head${center ? " lp-head-center" : ""}`} data-reveal>
-      <span className="lp-label lp-label-muted">{label}</span>
+      <span className="lp-label lp-label-accent">{label}</span>
       <h2 className="lp-h2">{title}</h2>
       {text ? <p className="lp-sub lp-muted">{text}</p> : null}
     </div>
@@ -56,7 +56,7 @@ export function Team() {
 
 export function HowItWorks() {
   return (
-    <section id="how" className="lp-section">
+    <section id="how" className="lp-section lp-section-alt">
       <div className="lp-wrap">
         <Head
           label="How it works"
@@ -95,7 +95,7 @@ export function Inbox() {
         />
         <div className="lp-grid-2">
           {INBOX.map((m, i) => (
-            <article key={m.title} className={`card inbox-card ${["wash-sky", "", "", "wash-peach"][i]}`} data-reveal>
+            <article key={m.title} className={`card inbox-card ${""}`} data-reveal>
               <span className="icon-box">
                 <Icon name={m.icon} />
               </span>
@@ -121,7 +121,7 @@ export function Inbox() {
 
 export function Rules() {
   return (
-    <section id="control" className="lp-section">
+    <section id="control" className="lp-section lp-section-alt">
       <div className="lp-wrap">
         <Head
           label="Control"
@@ -191,7 +191,7 @@ export function Plans({ onAuth }: { onAuth: AuthFn }) {
           {PLANS.map((p) => (
             <article key={p.name} className={`card plan-card ${p.wash}${p.featured ? " is-featured" : ""}`} data-reveal>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <h3 className="lp-h2" style={{ fontSize: 28, letterSpacing: -0.6 }}>
+                <h3 className="lp-h2" style={{ fontSize: 28 }}>
                   {p.name}
                 </h3>
                 {p.featured ? <span className="badge badge-lime">Popular</span> : null}

@@ -14,7 +14,7 @@ const TIMELINE = [
   { label: "Save", meta: "12 new leads saved" },
 ];
 
-// Mentions like "@Pat" get a lime highlight.
+// Mentions like "@Pat" get a highlight.
 function withMentions(text: string) {
   return text.split(/(@\w+)/g).map((part, i) =>
     part.startsWith("@") ? (

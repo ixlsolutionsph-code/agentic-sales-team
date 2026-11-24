@@ -18,7 +18,7 @@ export default function AuthPlaceholder({
     <main className="auth">
       <div className="card auth-card">
         <Image src="/logo-mark.png" alt="" width={40} height={40} />
-        <h1 className="lp-h2" style={{ fontSize: 32, letterSpacing: -0.7 }}>
+        <h1 className="lp-h2" style={{ fontSize: 32 }}>
           {signup ? "Create your account" : "Welcome back"}
         </h1>
         <p className="lp-body lp-muted">
