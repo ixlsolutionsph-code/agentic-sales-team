@@ -579,3 +579,39 @@ img { display: block; max-width: 100%; }
   .lp-tilt-inner { transform: none !important; }
 }
 .wash-purple { background: var(--wash-purple); border-color: var(--wash-purple); }
+
+/* Log in and sign-up */
+.auth-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.auth-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; color: var(--accent-hover); }
+.auth-error { margin: 0; color: var(--negative); font-size: 15px; }
+.auth-notice { margin: 0; color: var(--text-subdued); font-size: 15px; background: var(--accent-faint); border-radius: var(--r-md); padding: 10px 12px; }
+.strength { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.strength-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; flex: 1; }
+.strength-bars span { height: 4px; border-radius: var(--r-pill); background: var(--gray-200); }
+.strength-bars span.on.s1 { background: var(--negative); }
+.strength-bars span.on.s2 { background: var(--notice); }
+.strength-bars span.on.s3 { background: var(--accent); }
+.strength-bars span.on.s4 { background: var(--positive); }
+.strength-label { font-size: 13px; color: var(--text-muted); min-width: 64px; text-align: right; }
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Temporary signed-in page (Milestone 3 replaces it) */
+.home { min-height: 100vh; background: var(--bg-layer-1); padding: 48px 16px; }
+.home-inner { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+.ws-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ws-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg); }
+.ws-item.is-active { border-color: var(--accent); background: var(--accent-faint); }
+.ws-item .lp-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-gap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--gray-900); color: #fff; padding: 10px 16px; border-radius: var(--r-md); font-size: 15px; z-index: 80; }
+.toast.is-error { background: #991b1b; }

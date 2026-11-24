@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { HERO_EMAIL_KEY, loaderDuration, normaliseEmail } from "@/lib/landing";
-import AuthPlaceholder from "./landing/AuthPlaceholder";
+import Login from "./Login";
 import Hero from "./landing/Hero";
 import Loader from "./landing/Loader";
 import Nav from "./landing/Nav";
@@ -107,7 +107,7 @@ export default function Landing() {
     [openAuth],
   );
 
-  if (auth) return <AuthPlaceholder mode={auth} email={email} onBack={() => setAuth(null)} />;
+  if (auth) return <Login initialMode={auth} initialEmail={email} onBack={() => setAuth(null)} />;
 
   return (
     <div className="lp" ref={root}>
