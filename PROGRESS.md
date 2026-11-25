@@ -32,10 +32,29 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
     until M10. The Create a team modal has only the name field until M5.
   - "+ Add agent" is Spectrum blue (DESIGN.md), not the black in `02-sitemap.md`.
 
+- **Milestone 4: agents.** Finished and checked on 2026-11-25; the owner tried it and approved it.
+  - `lib/agentTypes.ts` (10 capabilities, 16 types, 10 templates, `isEngineReady`,
+    `parseMeetingMinutes` 5–480), `lib/visuals.ts`, `lib/agents/{new,settings,derive,stats,
+    sections,storeOps,store}.ts`, actions `saveAgent`, `saveAgentConfig` (partial upsert,
+    settings merge per capability), `setAgentPaused`, `removeAgent` (soft delete) in
+    `lib/workspace/actions.ts`, and store actions `createAgent`, `setAgentPaused`, `removeAgent`,
+    `saveAgentConfig`.
+  - Pages: `/create` (5-step wizard + success screen), `/agents` (cards, two-click delete),
+    `/agents/[id]` (header, sticky tabs by capability, empty sections, Configuration, Ask/Auto).
+  - All five M4 checks passed in the browser and in the database. 97 unit tests, lint and
+    `pnpm build` pass. Test account deleted.
+  - Ask/Auto is in `agent_config.settings[cap].mode`; `permissions` stays unused (null).
+  - Status shows Idle/Paused until jobs exist (M7). Sections have empty states; run buttons come
+    in M7–M8. Wording written where the docs give none: section empty texts, the wizard's
+    scrape and "Coming soon" notes, the meeting-length and end-time errors, "resumed" and
+    "deleted" toasts.
+  - Fixed: "Recent chats" no longer links to `/chats?team=…`; the team is held in the store
+    (`activeChatTeam`), as `01-prd.md` §12 asks.
+  - The owner's account has a real agent and a second workspace they made; keep them.
+
 ## Next
 
-- **Milestone 4: agents.** Started on 2026-11-25. Also fix: the sidebar "Recent chats" links use
-  `/chats?team=…`, but `01-prd.md` §12 says a chat has no bookmarkable link.
+- **Milestone 5: teams and the dashboard.** Wait for the owner to say go.
 
 ## Running it on the owner's Windows computer
 

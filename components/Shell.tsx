@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { signOut } from "@/lib/auth/actions";
 import { callAction } from "@/lib/auth/call-action";
 import { css } from "@/lib/css";
+import { visibleAgents } from "@/lib/agents/derive";
 import { activeNav, badgeText, headerTitle, initialsOf, NAV_LINKS, type NavKey } from "@/lib/nav";
 import { noMatchesText, searchLocal } from "@/lib/search";
 import { useApp } from "@/lib/store";
@@ -128,7 +129,8 @@ function Sidebar({
   onCloseDrawer: () => void;
   onRailSearch: () => void;
 }) {
-  const { teams, navCounts } = useApp();
+  const { teams, navCounts, setActiveChatTeam } = useApp();
+  const router = useRouter();
   const active = activeNav(pathname);
   const counts: Partial<Record<NavKey, number>> = { leads: navCounts.leads, emails: navCounts.emails };
 
@@ -201,15 +203,20 @@ function Sidebar({
           <ul className="side-chats">
             {teams.map((t) => (
               <li key={t.id}>
-                <Link
-                  href={`/chats?team=${encodeURIComponent(t.id)}`}
+                {/* The team is held in memory: a chat has no bookmarkable link (01-prd.md §12). */}
+                <button
+                  type="button"
                   className="side-item"
                   title={rail ? t.name : undefined}
                   aria-label={rail ? t.name : undefined}
+                  onClick={() => {
+                    setActiveChatTeam(t.id);
+                    router.push("/chats");
+                  }}
                 >
                   <AppIcon name="chat" />
                   <span className="side-label side-ellipsis">{t.name}</span>
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
@@ -227,14 +234,14 @@ function Sidebar({
 }
 
 function SidebarSearch({ inputRef }: { inputRef: React.RefObject<HTMLInputElement> }) {
-  const { agents, teams } = useApp();
+  const { agents, teams, states, config } = useApp();
   const router = useRouter();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(ref, open, () => setOpen(false));
 
-  const res = searchLocal(q, agents, teams);
+  const res = searchLocal(q, visibleAgents(agents, states, config), teams);
   const show = open && q.trim().length > 0;
   const none = res.agents.length === 0 && res.teams.length === 0;
 

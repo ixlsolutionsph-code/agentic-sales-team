@@ -8,8 +8,18 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import type { ActionResult } from "@/lib/auth/call-action";
 import type { CurrentUser } from "@/lib/auth/actions";
 import type { Workspace } from "@/lib/workspaces/actions";
+import { callAction } from "@/lib/auth/call-action";
+import type { NewAgentInput } from "@/lib/agents/new";
+import type { CapSettings } from "@/lib/agents/settings";
+import { mergeConfig, restoreKey, withState } from "@/lib/agents/storeOps";
 import { AGENTS_BASE, TEAMS_BASE } from "@/lib/data";
 import { persistOrRollback } from "@/lib/persist";
+import {
+  removeAgent as removeAgentAction,
+  saveAgent as saveAgentAction,
+  saveAgentConfig as saveAgentConfigAction,
+  setAgentPaused as setAgentPausedAction,
+} from "@/lib/workspace/actions";
 import { clearIfCurrent, type ToastMsg } from "@/lib/toast";
 import {
   EMPTY_WORKSPACE,
@@ -62,7 +72,12 @@ export type AppState = Lists & {
   wizard: WizardFields;
   teamModal: TeamModalFields;
   toast: ToastMsg | null;
+  // The team whose chat /chats shows. Held in memory only: a chat has no
+  // bookmarkable link (01-prd.md §12).
+  activeChatTeam: string | null;
 };
+
+type ConfigPatch = { role?: string; goal?: string; settings?: CapSettings };
 
 export type AppActions = {
   showToast: (text: string, error?: boolean) => void;
@@ -76,6 +91,13 @@ export type AppActions = {
   openTeamModal: (patch?: Partial<Omit<TeamModalFields, "open">>) => void;
   setTeamModal: (patch: Partial<Omit<TeamModalFields, "open">>) => void;
   closeTeamModal: () => void;
+  setActiveChatTeam: (teamId: string | null) => void;
+  // Agents. createAgent waits for the save; the others change the screen at
+  // once and undo the change (with an error message) if saving fails.
+  createAgent: (input: NewAgentInput, settings: CapSettings | null) => Promise<ActionResult<Agent>>;
+  setAgentPaused: (agentId: string, paused: boolean) => Promise<ActionResult>;
+  removeAgent: (agentId: string) => Promise<ActionResult>;
+  saveAgentConfig: (agentId: string, patch: ConfigPatch) => Promise<ActionResult>;
   // Show a change at once; undo it and show the error if saving fails.
   persist: <T>(opts: {
     apply: () => void;
@@ -111,7 +133,11 @@ export function AppProvider({
   const [wizard, setWizardState] = useState<WizardFields>(EMPTY_WIZARD);
   const [teamModal, setTeamModalState] = useState<TeamModalFields>(EMPTY_TEAM_MODAL);
   const [toast, setToast] = useState<ToastMsg | null>(null);
+  const [activeChatTeam, setActiveChatTeam] = useState<string | null>(null);
   const toastId = useRef(0);
+  // The latest lists, so an undo can put back exactly what was there before.
+  const listsRef = useRef(lists);
+  listsRef.current = lists;
 
   const showToast = useCallback((text: string, error = false) => {
     toastId.current += 1;
@@ -119,8 +145,20 @@ export function AppProvider({
   }, []);
   const clearToast = useCallback((id: number) => setToast((cur) => clearIfCurrent(cur, id)), []);
 
-  const actions = useMemo<AppActions>(
-    () => ({
+  const actions = useMemo<AppActions>(() => {
+    const persist: AppActions["persist"] = (opts) => persistOrRollback({ ...opts, onError: (m) => showToast(m, true) });
+
+    // Optimistic change to one agent's state row, undone if saving fails.
+    const changeState = (agentId: string, patch: Partial<AgentState>, save: () => Promise<ActionResult>) => {
+      const prev = listsRef.current.states[agentId];
+      return persist({
+        apply: () => setListsState((cur) => ({ ...cur, states: { ...cur.states, [agentId]: withState(cur.states[agentId], patch) } })),
+        rollback: () => setListsState((cur) => ({ ...cur, states: restoreKey(cur.states, agentId, prev) })),
+        save,
+      });
+    };
+
+    return {
       showToast,
       clearToast,
       setUser: (patch) => setMe((cur) => (cur ? { ...cur, ...patch } : cur)),
@@ -132,10 +170,32 @@ export function AppProvider({
       openTeamModal: (patch) => setTeamModalState({ ...EMPTY_TEAM_MODAL, ...patch, open: true }),
       setTeamModal: (patch) => setTeamModalState((cur) => ({ ...cur, ...patch })),
       closeTeamModal: () => setTeamModalState(EMPTY_TEAM_MODAL),
-      persist: (opts) => persistOrRollback({ ...opts, onError: (m) => showToast(m, true) }),
-    }),
-    [showToast, clearToast],
-  );
+      setActiveChatTeam,
+      createAgent: async (input, settings) => {
+        const res = await callAction(() => saveAgentAction({ ...input, settings }));
+        if (res.ok && res.data) {
+          const agent = res.data;
+          setListsState((cur) => ({
+            ...cur,
+            agents: [...cur.agents, agent],
+            config: settings ? { ...cur.config, [agent.id]: mergeConfig(undefined, { settings }) } : cur.config,
+          }));
+        }
+        return res;
+      },
+      setAgentPaused: (agentId, paused) => changeState(agentId, { paused }, () => setAgentPausedAction(agentId, paused)),
+      removeAgent: (agentId) => changeState(agentId, { removed: true }, () => removeAgentAction(agentId)),
+      saveAgentConfig: (agentId, patch) => {
+        const prev = listsRef.current.config[agentId];
+        return persist({
+          apply: () => setListsState((cur) => ({ ...cur, config: { ...cur.config, [agentId]: mergeConfig(cur.config[agentId], patch) } })),
+          rollback: () => setListsState((cur) => ({ ...cur, config: restoreKey(cur.config, agentId, prev) })),
+          save: () => saveAgentConfigAction(agentId, patch),
+        });
+      },
+      persist,
+    };
+  }, [showToast, clearToast]);
 
   const value = useMemo(
     () => ({
@@ -147,9 +207,10 @@ export function AppProvider({
       wizard,
       teamModal,
       toast,
+      activeChatTeam,
       ...actions,
     }),
-    [lists, me, wsList, navCounts, wizard, teamModal, toast, actions],
+    [lists, me, wsList, navCounts, wizard, teamModal, toast, activeChatTeam, actions],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
