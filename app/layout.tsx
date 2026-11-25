@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import AppFrame from "@/components/AppFrame";
+import { currentUser } from "@/lib/auth/actions";
+import { AppProvider } from "@/lib/store";
+import { EMPTY_WORKSPACE } from "@/lib/types";
+import { loadWorkspace } from "@/lib/workspace/actions";
+import { listWorkspaces } from "@/lib/workspaces/actions";
 import "./globals.css";
 
 // Source Sans 3: a free font by Adobe, standing in for Adobe Clean.
@@ -23,10 +29,21 @@ export const metadata: Metadata = {
   icons: { icon: "/logo-mark.png" },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Fills the client store once per page load: the signed-in user and the
+// active workspace's data.
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await currentUser();
+  const [workspace, workspaces] = user
+    ? await Promise.all([loadWorkspace(), listWorkspaces()])
+    : [EMPTY_WORKSPACE, []];
+
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AppProvider user={user} workspace={workspace} workspaces={workspaces}>
+          <AppFrame>{children}</AppFrame>
+        </AppProvider>
+      </body>
     </html>
   );
 }
