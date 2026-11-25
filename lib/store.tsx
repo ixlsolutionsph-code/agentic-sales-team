@@ -14,7 +14,13 @@ import type { CapSettings } from "@/lib/agents/settings";
 import { mergeConfig, restoreKey, withState } from "@/lib/agents/storeOps";
 import { AGENTS_BASE, TEAMS_BASE } from "@/lib/data";
 import { persistOrRollback } from "@/lib/persist";
+import type { NewTeamInput } from "@/lib/teams/new";
+import { iconBg } from "@/lib/teams/new";
 import {
+  deleteTeam as deleteTeamAction,
+  editTeam as editTeamAction,
+  saveTeam as saveTeamAction,
+  saveTeamMembers as saveTeamMembersAction,
   removeAgent as removeAgentAction,
   saveAgent as saveAgentAction,
   saveAgentConfig as saveAgentConfigAction,
@@ -98,6 +104,12 @@ export type AppActions = {
   setAgentPaused: (agentId: string, paused: boolean) => Promise<ActionResult>;
   removeAgent: (agentId: string) => Promise<ActionResult>;
   saveAgentConfig: (agentId: string, patch: ConfigPatch) => Promise<ActionResult>;
+  // Teams. createTeam waits for the save; the others change the screen at once
+  // and undo the change if saving fails.
+  createTeam: (input: NewTeamInput) => Promise<ActionResult<Team>>;
+  editTeam: (teamId: string, patch: { name: string; icon: string; goal: string }) => Promise<ActionResult>;
+  setTeamMembers: (teamId: string, members: string[]) => Promise<ActionResult>;
+  deleteTeam: (teamId: string) => Promise<ActionResult>;
   // Show a change at once; undo it and show the error if saving fails.
   persist: <T>(opts: {
     apply: () => void;
@@ -191,6 +203,50 @@ export function AppProvider({
           apply: () => setListsState((cur) => ({ ...cur, config: { ...cur.config, [agentId]: mergeConfig(cur.config[agentId], patch) } })),
           rollback: () => setListsState((cur) => ({ ...cur, config: restoreKey(cur.config, agentId, prev) })),
           save: () => saveAgentConfigAction(agentId, patch),
+        });
+      },
+      createTeam: async (input) => {
+        const res = await callAction(() => saveTeamAction(input));
+        if (res.ok && res.data) {
+          const team = res.data;
+          setListsState((cur) => ({ ...cur, teams: [...cur.teams.filter((t) => t.id !== team.id), team] }));
+        }
+        return res;
+      },
+      editTeam: (teamId, patch) => {
+        const prev = listsRef.current.teams.find((t) => t.id === teamId);
+        const next = { name: patch.name.trim(), icon: patch.icon, iconBg: iconBg(patch.icon), goal: patch.goal.trim() };
+        return persist({
+          apply: () => setListsState((cur) => ({ ...cur, teams: cur.teams.map((t) => (t.id === teamId ? { ...t, ...next } : t)) })),
+          rollback: () =>
+            setListsState((cur) => ({ ...cur, teams: prev ? cur.teams.map((t) => (t.id === teamId ? prev : t)) : cur.teams })),
+          save: () => editTeamAction(teamId, patch),
+        });
+      },
+      setTeamMembers: (teamId, members) => {
+        const prev = listsRef.current.teamMembers[teamId];
+        return persist({
+          apply: () => setListsState((cur) => ({ ...cur, teamMembers: { ...cur.teamMembers, [teamId]: members } })),
+          rollback: () => setListsState((cur) => ({ ...cur, teamMembers: restoreKey(cur.teamMembers, teamId, prev) })),
+          save: () => saveTeamMembersAction(teamId, members),
+        });
+      },
+      deleteTeam: (teamId) => {
+        const before = listsRef.current;
+        const prevTeams = before.teams;
+        const prevMembers = before.teamMembers[teamId];
+        return persist({
+          apply: () => {
+            setListsState((cur) => ({
+              ...cur,
+              teams: cur.teams.filter((t) => t.id !== teamId),
+              teamMembers: restoreKey(cur.teamMembers, teamId, undefined),
+            }));
+            setActiveChatTeam((cur) => (cur === teamId ? null : cur));
+          },
+          rollback: () =>
+            setListsState((cur) => ({ ...cur, teams: prevTeams, teamMembers: restoreKey(cur.teamMembers, teamId, prevMembers) })),
+          save: () => deleteTeamAction(teamId),
         });
       },
       persist,

@@ -52,9 +52,33 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
     (`activeChatTeam`), as `01-prd.md` §12 asks.
   - The owner's account has a real agent and a second workspace they made; keep them.
 
+- **Milestone 5: teams and the dashboard.** Finished and checked on 2026-11-25; the owner tried it and approved it.
+  - `lib/teams/{new,membership,store}.ts` (`newTeamId` "tx…", 6 icons with tints, `coverage`, `gaps`,
+    `gapAgentType`, `checkNewTeam`, `membersOfTeam`, `teamsOfAgent`, `teammatesOf`, `leadPoolOf`),
+    `lib/workspace/{stats,statsShape}.ts` (`getWorkspaceStats`, `getTeamLeads`), `lib/useWorkspaceStats.ts`.
+  - Actions `saveTeam`, `editTeam`, `saveTeamMembers` (full list upserted into `team_members`),
+    `deleteTeam` (removes `teams` + `team_members`, keeps messages), `loadStats`, `loadTeamLeads`;
+    store actions `createTeam`, `editTeam`, `setTeamMembers`, `deleteTeam`.
+  - `components/CreateTeamModal.tsx` (name, icon, template, members, ✓/○ coverage, gap quick-create,
+    shared goal), `components/teams/TeamBits.tsx`, `/teams/[id]` (`TeamDetail.tsx`: KPIs, Working now,
+    coverage, members with ×, first 12 leads, goal, recent activity, Edit / Add agents / Delete team),
+    `/dashboard` (`HomeClient.tsx`: greeting, hub with team pills, ring of up to 8 agents, team cards).
+  - `teamKpis` now works from the members' accepted leads (never the legacy `teams` counters);
+    In pipeline = contacted, engaged or replied.
+  - All three M5 checks passed in the browser and in the database (also with sample leads, a meeting
+    and an activity row in a test account, since deleted). 115 unit tests, lint and `pnpm build` pass.
+  - Choices where the docs are silent: a proposal gap creates a Custom agent named "Proposal Agent";
+    "leads worked this month" counts accepted leads updated this month (browser's time zone);
+    wording "Nobody is working right now.", "No activity yet.", "No agents yet. You can create the
+    ones this team needs below."
+  - Modals now keep their title and buttons in view; only the middle scrolls.
+  - Pending approvals on the team page come in M9. `/chats` still shows "No conversations yet" until
+    M9; the owner chose to leave it.
+  - The owner's account now also has a real team and a second agent made from a gap; keep them.
+
 ## Next
 
-- **Milestone 5: teams and the dashboard.** Wait for the owner to say go.
+- **Milestone 6: products and leads.** Wait for the owner to say go.
 
 ## Running it on the owner's Windows computer
 

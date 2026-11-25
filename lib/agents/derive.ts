@@ -4,6 +4,7 @@
 import type { Agent, AgentConfig, AgentState, Team } from "@/lib/types";
 import { capabilityLabel, TEAM_TEMPLATES } from "@/lib/agentTypes";
 import type { AgentStatus } from "@/lib/visuals";
+import { sumNumbers, type AgentNumbers } from "@/lib/workspace/statsShape";
 import { effectiveRoleGoal } from "./settings";
 
 // A job as far as the status needs it. Jobs arrive in Milestone 7.
@@ -47,14 +48,20 @@ export function teamSubtitle(team: Pick<Team, "template">, memberCount: number):
   return `${label} team · ${memberCount} ${memberCount === 1 ? "agent" : "agents"}`;
 }
 
-// Team KPIs: Meetings, In pipeline, Leads, Avg lead score. Lead data arrives
-// in Milestone 6; scores of 0 (not scored) don't count toward the average.
-export function teamKpis(team: Pick<Team, "meetings" | "pipeline">, leadScores: number[] = []) {
-  const scored = leadScores.filter((s) => s > 0);
+// Team KPIs: Meetings, In pipeline, Leads, Avg lead score, worked out from the
+// members' accepted leads. The legacy teams.meetings / pipeline / leads
+// columns are never used. Scores of 0 (not scored) don't count toward the average.
+export function teamKpis(memberIds: string[], perAgent: Record<string, AgentNumbers>) {
+  const t = sumNumbers(memberIds, perAgent);
   return {
-    meetings: team.meetings,
-    pipeline: team.pipeline,
-    leads: leadScores.length,
-    avgScore: scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0,
+    meetings: t.meetings,
+    pipeline: t.pipeline,
+    leads: t.leads,
+    avgScore: t.scoredCount ? Math.round(t.scoredSum / t.scoredCount) : 0,
   };
+}
+
+// How many of these agents are working right now.
+export function workingCount(agentIds: string[], states: Record<string, AgentState>, jobs: LiveJob[] = []): number {
+  return agentIds.filter((id) => !isRemoved(id, states) && agentNow({ id }, states[id], jobs).status === "working").length;
 }

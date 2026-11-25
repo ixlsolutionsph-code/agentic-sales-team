@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/lib/types";
-import { agentNow, liveAgentCount, teamKpis, teamSubtitle, visibleAgents } from "./derive";
+import { agentNow, liveAgentCount, teamKpis, teamSubtitle, visibleAgents, workingCount } from "./derive";
 import { EMPTY_STATS, replyRate, workLine } from "./stats";
 
 describe("agent status (derived, never stored)", () => {
@@ -46,9 +46,26 @@ describe("teams and stats helpers", () => {
     expect(teamSubtitle({ template: "nope" }, 1)).toBe("Custom team · 1 agent");
   });
 
-  it("averages only scored leads", () => {
-    expect(teamKpis({ meetings: 2, pipeline: "-" }, [0, 80, 60])).toEqual({ meetings: 2, pipeline: "-", leads: 3, avgScore: 70 });
-    expect(teamKpis({ meetings: 0, pipeline: "-" })).toEqual({ meetings: 0, pipeline: "-", leads: 0, avgScore: 0 });
+  it("works team KPIs out from the members' leads, averaging only scored leads", () => {
+    const z = { leads: 0, pipeline: 0, scoredSum: 0, scoredCount: 0, monthLeads: 0, meetings: 0 };
+    const per = {
+      a: { ...z, leads: 3, pipeline: 1, scoredSum: 140, scoredCount: 2, meetings: 2 },
+      b: { ...z, leads: 1, pipeline: 1, scoredSum: 50, scoredCount: 1 },
+      c: { ...z, leads: 9, pipeline: 9, scoredSum: 900, scoredCount: 9, meetings: 9 },
+    };
+    expect(teamKpis(["a", "b"], per)).toEqual({ meetings: 2, pipeline: 2, leads: 4, avgScore: 63 });
+    expect(teamKpis(["a", "a"], per).leads).toBe(3);
+    expect(teamKpis([], per)).toEqual({ meetings: 0, pipeline: 0, leads: 0, avgScore: 0 });
+    expect(teamKpis(["nobody"], {})).toEqual({ meetings: 0, pipeline: 0, leads: 0, avgScore: 0 });
+  });
+
+  it("counts working members, leaving out deleted ones", () => {
+    const jobs = [
+      { agentId: "a", kind: "scrape", status: "running", leadCount: 0 },
+      { agentId: "b", kind: "scrape", status: "queued", leadCount: 0 },
+    ];
+    expect(workingCount(["a", "b", "c"], { b: { removed: true, paused: false } }, jobs)).toBe(1);
+    expect(workingCount(["a"], {})).toBe(0);
   });
 
   it("shows No work yet until there is work", () => {
