@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedBody, generateBody, parseJSONReply, readEmbedReply, readGenerateReply } from "./geminiShape";
+import { embedBody, generateBody, parseJSONReply, readEmbedReply, readGenerateReply, thinkingOff } from "./geminiShape";
 import { cleanField, fence, sanitizeText, UNTRUSTED_RULE } from "./untrusted";
 import { chunk, normalize, stripCodeFence, toPgVector } from "./vector";
 
@@ -54,6 +54,13 @@ describe("Gemini request and reply", () => {
       responseSchema: { type: "object" },
     });
     expect("responseMimeType" in generateBody("", "hi", { temperature: 0.7, maxTokens: 400 }).generationConfig).toBe(false);
+  });
+
+  it("turns thinking off the way each model family expects", () => {
+    expect(thinkingOff("gemini-2.5-flash")).toEqual({ thinkingBudget: 0 });
+    expect(thinkingOff("gemini-3-flash-preview")).toEqual({ thinkingLevel: "minimal" });
+    expect(thinkingOff("gemini-3.5-flash")).toEqual({ thinkingLevel: "minimal" });
+    expect(generateBody("", "hi", { temperature: 0.2, maxTokens: 10 }, undefined, "gemini-3-flash-preview").generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
   });
 
   it("reads text, and treats empty or blocked replies as errors", () => {

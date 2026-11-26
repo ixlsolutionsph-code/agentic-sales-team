@@ -29,7 +29,9 @@ export async function getWorkspaceStats(workspaceId: string, monthStart: Date): 
       SELECT agent_id, count(*) AS meetings FROM meetings WHERE user_id = ${workspaceId}::uuid GROUP BY agent_id`),
     db.execute(sql`
       SELECT agent_id, kind, status,
-             CASE WHEN jsonb_typeof(params->'leadIds') = 'array' THEN jsonb_array_length(params->'leadIds') ELSE 0 END AS lead_count
+             CASE WHEN jsonb_typeof(params->'leadCount') = 'number' THEN (params->>'leadCount')::int
+                  WHEN jsonb_typeof(params->'leadIds') = 'array' THEN jsonb_array_length(params->'leadIds')
+                  ELSE 0 END AS lead_count
       FROM jobs
       WHERE user_id = ${workspaceId}::uuid AND status IN ('queued', 'running')`),
     db.execute(sql`

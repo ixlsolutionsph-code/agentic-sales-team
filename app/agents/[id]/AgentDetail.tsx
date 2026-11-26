@@ -9,14 +9,17 @@ import { capabilityLabel, isEngineReady } from "@/lib/agentTypes";
 import { agentNow, visibleAgents } from "@/lib/agents/derive";
 import { agentSections, type SectionId } from "@/lib/agents/sections";
 import { capMode, withMode } from "@/lib/agents/settings";
-import { EMPTY_STATS, replyRate } from "@/lib/agents/stats";
+import { replyRate } from "@/lib/agents/stats";
 import { css } from "@/lib/css";
 import { useApp } from "@/lib/store";
 import type { Agent } from "@/lib/types";
+import { useAgentWork } from "@/lib/useAgentWork";
 import AgentConfigForm from "./AgentConfigForm";
+import { DraftList, ProposalList, RunButton, TaskList } from "./AgentWork";
 
 // /agents/[id]: header, sticky section tabs, sections, Configuration.
-// Run buttons come in Milestones 7–8; the sections show empty states now.
+// Run buttons for qualify, research, outreach and proposals (Milestone 7);
+// Find leads comes with the lead search in Milestone 8.
 export default function AgentDetail({ id }: { id: string }) {
   const { agents, states, config } = useApp();
   const agent = visibleAgents(agents, states, config).find((a) => a.id === id);
@@ -45,7 +48,8 @@ function AgentView({ agent }: { agent: Agent }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<SectionId>("overview");
-  const now = agentNow(agent, states[agent.id]);
+  const { work, reload, run, liveJobs } = useAgentWork(agent.id);
+  const now = agentNow(agent, states[agent.id], liveJobs);
   const paused = states[agent.id]?.paused === true;
   const sections = agentSections(agent.capabilities);
   const settings = config[agent.id]?.settings ?? null;
@@ -145,22 +149,35 @@ function AgentView({ agent }: { agent: Agent }) {
       {has("scrape") || has("qualify") ? (
         <Section id="leads" title="Leads">
           {has("scrape") ? <SubEmpty title="Find leads" text="No leads found yet." /> : null}
-          {has("qualify") ? <SubEmpty title="Qualify leads" text="No leads qualified yet." /> : null}
+          {has("qualify") ? (
+            <RunRow title="Qualify leads" text="Scores the team's accepted leads that have no score yet, 5 at a time.">
+              <RunButton kind="qualify" label="Qualify leads" tasks={work.tasks} disabled={paused} run={run} />
+            </RunRow>
+          ) : null}
         </Section>
       ) : null}
       {has("research") ? (
         <Section id="research" title="Research">
-          <SubEmpty title="Research leads" text="No leads researched yet." />
+          <RunRow title="Research leads" text="Writes a short brief for the team's accepted leads that have none yet, 5 at a time.">
+            <RunButton kind="research" label="Research leads" tasks={work.tasks} disabled={paused} run={run} />
+          </RunRow>
+          <p className="sub-empty-text">Leads researched so far: {work.stats.researched}</p>
         </Section>
       ) : null}
       {has("outreach") ? (
         <Section id="emails" title="Emails">
-          <SubEmpty title="Run outreach" text="No drafts yet." />
+          <RunRow title="Run outreach" text="Drafts a first email (or a message) for 5 accepted leads with no draft yet. Nothing is sent: you send from your own mail app.">
+            <RunButton kind="outreach" label="Run outreach" tasks={work.tasks} disabled={paused} run={run} />
+          </RunRow>
+          <DraftList drafts={work.drafts} onChanged={reload} />
         </Section>
       ) : null}
       {has("proposal") ? (
         <Section id="proposals" title="Proposals">
-          <SubEmpty title="Generate proposals" text="No proposals yet." />
+          <RunRow title="Generate proposals" text="Writes a proposal with your real products and prices for 5 accepted leads that have none yet.">
+            <RunButton kind="proposal" label="Generate proposals" tasks={work.tasks} disabled={paused} run={run} />
+          </RunRow>
+          <ProposalList proposals={work.proposals} onChanged={reload} />
         </Section>
       ) : null}
       {has("follow-up") ? (
@@ -175,15 +192,15 @@ function AgentView({ agent }: { agent: Agent }) {
       ) : null}
 
       <Section id="tasks" title="Tasks">
-        <p className="sub-empty-text">No tasks yet.</p>
+        <TaskList tasks={work.tasks} />
       </Section>
 
       <Section id="performance" title="Performance">
         <div className="perf-grid">
-          <Stat label="Leads worked" value={String(EMPTY_STATS.leads)} />
-          <Stat label="Drafts sent" value={String(EMPTY_STATS.sent)} />
-          <Stat label="Reply rate" value={`${replyRate(EMPTY_STATS)}%`} />
-          <Stat label="Researched" value={String(EMPTY_STATS.researched)} />
+          <Stat label="Leads worked" value={String(work.stats.leads)} />
+          <Stat label="Drafts sent" value={String(work.stats.sent)} />
+          <Stat label="Reply rate" value={`${replyRate(work.stats)}%`} />
+          <Stat label="Researched" value={String(work.stats.researched)} />
         </div>
       </Section>
 
@@ -249,6 +266,18 @@ function SubEmpty({ title, text }: { title: string; text: string }) {
     <div className="sub-empty">
       <h4 className="sub-title">{title}</h4>
       <p className="sub-empty-text">{text}</p>
+    </div>
+  );
+}
+
+function RunRow({ title, text, children }: { title: string; text: string; children: React.ReactNode }) {
+  return (
+    <div className="run-row">
+      <div>
+        <h4 className="sub-title">{title}</h4>
+        <p className="sub-empty-text">{text}</p>
+      </div>
+      {children}
     </div>
   );
 }

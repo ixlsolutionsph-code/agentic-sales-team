@@ -10,17 +10,25 @@ export const EMBED_BATCH = 100;
 export type GenOpts = { temperature: number; maxTokens: number };
 export type EmbedTask = "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
 
-export function generateBody(system: string, prompt: string, opts: GenOpts, schema?: Record<string, unknown>) {
+export function generateBody(system: string, prompt: string, opts: GenOpts, schema?: Record<string, unknown>, model: string = DEFAULT_MODEL) {
   return {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: opts.temperature,
       maxOutputTokens: opts.maxTokens,
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: thinkingOff(model),
       ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}),
     },
   };
+}
+
+// Thinking off. Gemini 2.5 models take `thinkingBudget: 0` (01-prd.md §8).
+// Gemini 3 models use `thinkingLevel`; with them `thinkingBudget: 0` sometimes
+// stalled past the 30 s timeout in tests (2026-11-26), while "minimal"
+// answered in about 1.3 s every time.
+export function thinkingOff(model: string): { thinkingBudget: 0 } | { thinkingLevel: "minimal" } {
+  return /^gemini-([3-9]|\d{2,})/.test(model) ? { thinkingLevel: "minimal" } : { thinkingBudget: 0 };
 }
 
 // The reply's text. A reply with no text, or one that stopped for any

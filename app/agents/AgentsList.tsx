@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import { AgentAvatar, StatusPill } from "@/components/agents/AgentBits";
-import { agentNow, visibleAgents } from "@/lib/agents/derive";
-import { EMPTY_STATS, workLine } from "@/lib/agents/stats";
+import { agentNow, visibleAgents, type LiveJob } from "@/lib/agents/derive";
+import { EMPTY_STATS, workLine, type AgentStats } from "@/lib/agents/stats";
+import { loadAgentStats } from "@/lib/jobs/actions";
+import { useWorkspaceStats } from "@/lib/useWorkspaceStats";
 import { css } from "@/lib/css";
 import { useApp } from "@/lib/store";
 import type { Agent } from "@/lib/types";
@@ -14,6 +17,17 @@ import { useConfirmClick } from "@/lib/useConfirmClick";
 export default function AgentsList() {
   const { agents, states, config } = useApp();
   const list = visibleAgents(agents, states, config);
+  const { liveJobs } = useWorkspaceStats();
+  const [stats, setStats] = useState<Record<string, AgentStats>>({});
+  useEffect(() => {
+    let alive = true;
+    loadAgentStats()
+      .then((s) => alive && setStats(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (!list.length) {
     return (
@@ -33,16 +47,16 @@ export default function AgentsList() {
     <ul className="agent-grid">
       {list.map((a) => (
         <li key={a.id}>
-          <AgentCard agent={a} />
+          <AgentCard agent={a} stats={stats[a.id] ?? EMPTY_STATS} liveJobs={liveJobs} />
         </li>
       ))}
     </ul>
   );
 }
 
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent, stats, liveJobs }: { agent: Agent; stats: AgentStats; liveJobs: LiveJob[] }) {
   const { states, removeAgent } = useApp();
-  const now = agentNow(agent, states[agent.id]);
+  const now = agentNow(agent, states[agent.id], liveJobs);
   const del = useConfirmClick();
 
   return (
@@ -56,7 +70,7 @@ function AgentCard({ agent }: { agent: Agent }) {
         <StatusPill status={now.status} />
       </div>
       <p className="agent-card-task">{now.task}</p>
-      <p className="agent-card-work">{workLine(EMPTY_STATS)}</p>
+      <p className="agent-card-work">{workLine(stats)}</p>
       <div className="agent-card-actions">
         <button
           type="button"

@@ -30,15 +30,19 @@ import {
   type LeadStage,
 } from "@/lib/leads/types";
 import { refreshNavCounts } from "@/lib/navCountsEvent";
+import { loadTasks, startRun } from "@/lib/jobs/actions";
+import { teammatesOf } from "@/lib/teams/membership";
+import { kickRunner } from "@/lib/useAgentWork";
 import { useApp } from "@/lib/store";
 import { safeUrl } from "@/lib/url/safeUrl";
 
 type Tab = "active" | "pending";
 
 // /leads (02-sitemap.md §6): Active and Pending tabs, filters, Import CSV,
-// + Add lead, and the lead details window. Run buttons come in Milestone 7.
+// + Add lead, Run outreach per lead, and the lead details window.
 export default function LeadsClient() {
-  const { agents, states, config, showToast } = useApp();
+  const { agents, states, config, teams, teamMembers, showToast } = useApp();
+  const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [tab, setTab] = useState<Tab>("active");
@@ -67,6 +71,33 @@ export default function LeadsClient() {
   const pending = leads.filter((l) => l.review === "pending");
   const shown = active.filter((l) => (!agentFilter || l.agentId === agentFilter) && (!stageFilter || l.status === stageFilter));
   const openLead = leads.find((l) => l.id === openId) ?? null;
+
+  // Who writes the email for a lead: its own agent if it drafts emails, else
+  // the first teammate that does.
+  function writerFor(l: Lead): string | null {
+    const can = (id: string) => live.some((a) => a.id === id && a.capabilities.includes("outreach") && !states[id]?.paused);
+    if (can(l.agentId)) return l.agentId;
+    return teammatesOf(l.agentId, teams, teamMembers, states).find(can) ?? null;
+  }
+
+  async function onOutreach(l: Lead) {
+    const writer = writerFor(l);
+    if (!writer) return;
+    setOutreachBusy(l.id);
+    const res = await callAction(() => startRun({ agentId: writer, kind: "outreach", leadIds: [l.id] }));
+    if (!res.ok) {
+      setOutreachBusy(null);
+      return showToast(res.error, true);
+    }
+    await kickRunner();
+    const [task] = await loadTasks([res.data!.jobId]).catch(() => []);
+    setOutreachBusy(null);
+    refreshNavCounts();
+    if (!task || task.status === "queued" || task.status === "running") return showToast("Drafting… The email will appear in Emails shortly.");
+    if (task.status === "failed") return showToast(task.summary, true);
+    if (task.summary.startsWith("Drafted 1")) return showToast(`Draft for ${l.name} is ready in Emails`);
+    showToast(task.summary);
+  }
 
   function patch(id: string, p: Partial<Lead>) {
     setLeads((cur) => cur.map((l) => (l.id === id ? { ...l, ...p } : l)));
@@ -197,6 +228,9 @@ export default function LeadsClient() {
                     <th scope="col">Stage</th>
                     <th scope="col">Score</th>
                     <th scope="col">
+                      <span className="sr-only">Run outreach</span>
+                    </th>
+                    <th scope="col">
                       <span className="sr-only">Advance</span>
                     </th>
                     <th scope="col">
@@ -220,6 +254,22 @@ export default function LeadsClient() {
                       </td>
                       <td className="cell-nowrap">
                         <Score score={l.score} />
+                      </td>
+                      <td>
+                        {(() => {
+                          const writer = writerFor(l);
+                          return (
+                            <Btn
+                              size="sm"
+                              disabled={!writer || outreachBusy !== null}
+                              title={writer ? undefined : "No agent on this lead's team drafts emails."}
+                              onClick={() => onOutreach(l)}
+                              aria-label={`Run outreach for ${l.name}`}
+                            >
+                              {outreachBusy === l.id ? "Running…" : "Run outreach"}
+                            </Btn>
+                          );
+                        })()}
                       </td>
                       <td>
                         <Btn size="sm" disabled={!nextStage(l.status)} onClick={() => onAdvance(l)} aria-label={`Advance ${l.name}`}>

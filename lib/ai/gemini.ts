@@ -57,7 +57,8 @@ export async function aiGenerate(
   opts: Partial<GenOpts> & { model?: string } = {},
 ): Promise<string> {
   const o = { temperature: opts.temperature ?? 0.7, maxTokens: opts.maxTokens ?? 400 };
-  const json = await post(`${GEMINI_BASE}/${model(opts.model)}:generateContent`, generateBody(system, prompt, o), GEN_TIMEOUT_MS);
+  const m = model(opts.model);
+  const json = await post(`${GEMINI_BASE}/${m}:generateContent`, generateBody(system, prompt, o, undefined, m), GEN_TIMEOUT_MS);
   return readGenerateReply(json);
 }
 
@@ -69,7 +70,8 @@ export async function aiJSON<T>(
   opts: Partial<GenOpts> & { model?: string } = {},
 ): Promise<T> {
   const o = { temperature: opts.temperature ?? 0.6, maxTokens: opts.maxTokens ?? 700 };
-  const json = await post(`${GEMINI_BASE}/${model(opts.model)}:generateContent`, generateBody(system, prompt, o, schema), GEN_TIMEOUT_MS);
+  const m = model(opts.model);
+  const json = await post(`${GEMINI_BASE}/${m}:generateContent`, generateBody(system, prompt, o, schema, m), GEN_TIMEOUT_MS);
   return parseJSONReply<T>(readGenerateReply(json));
 }
 

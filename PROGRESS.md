@@ -98,15 +98,51 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
     these filters.", "Create an agent first…", the lead details window's empty texts).
   - Sample files for the owner are in `Downloads/MD Files - Building Your Agentic Sales Team/Sample files/`.
 
+- **Milestone 7: jobs, engines and emails.** Finished and checked on 2026-11-26; all six checks pass
+  and the owner approved it. 172 unit tests, lint and `pnpm build` pass.
+  - Built: `lib/jobs/{limits,errors,runtime,store,context,enqueue,drain,tasks,actions}.ts`,
+    `lib/scrape/steps.ts`, engines `lib/ai/{engine,research,qualify,assess,match,outreach,proposal}.ts`,
+    `lib/leads/{apply,fit}.ts`, `lib/emails/{store,actions,mailto}.ts`, `lib/cron/auth.ts`,
+    `app/api/jobs/run`, `app/api/cron/jobs`, `app/api/cron/scrape` (secret check only until M8),
+    `vercel.json`, agent page run buttons + Tasks + Performance (`AgentWork.tsx`, `lib/useAgentWork.ts`),
+    Run outreach on the Leads page, `/emails` (`EmailsClient.tsx`, `components/emails/DraftActions.tsx`).
+  - `CRON_SECRET` was generated and added to `.env.local`.
+  - Checks passed: 2 (6 simultaneous outreach saves → 1 open draft per lead), 3 (Mark sent → contacted;
+    Discard hides, counts stay), 4 (101st run refused with the exact text), 5 (cron 401 without / with a
+    wrong secret; with it, it drained a queued job), 6 (no key → "AI isn't set up…").
+  - **Check 1 passed** (Research → Qualify → Run outreach → Generate proposals on 5 leads): 5 briefs,
+    5 scores (85, 85, 85, 65, and 5 for the off-target software lead), 5 emails (120–135 words, "Dear …",
+    real catalog products, no "!"), 5 proposals (144–196 words, 2–4 real products each, every price
+    exactly as in the catalog). The test account was deleted afterwards; nothing was left behind.
+  - Gemini's free tier allows only **20 requests a day** for `gemini-3-flash` per Google project, and
+    some answers take 13 s or more (a few hit the 30 s limit and show "Failed"; a re-run picks them
+    up). The owner has made three keys; the third (in `.env.local` now) finished the checks.
+  - Seen in testing, not changed: proposals come back as one block of text, and one proposal opened
+    with "I am writing to you as an AI sales agent" (the system prompt says the writer is one of the
+    business's AI sales agents). Ask the owner whether to change either.
+  - Fixed while finishing check 1: with Gemini 3 models, `thinkingBudget: 0` sometimes stalled past
+    30 s; `thinkingOff(model)` now sends `thinkingLevel: "minimal"` for Gemini 3+ (about 1.3 s) and
+    keeps `thinkingBudget: 0` for 2.5. Emails written as one block now get the greeting and sign-off
+    on their own lines (prompt rule + `tidyBody`). 172 unit tests pass.
+  - Fixed while testing: the stale-job reaper sent its time limit as text (Postgres error), and the
+    cron GET answer was being cached by Next (now `revalidate = 0`, `fetchCache = "force-no-store"`).
+    An open agent page re-nudges the runner every 15 s while a run waits.
+  - Choices where the docs are silent: pressing a run button on the agent page is the go-ahead (the
+    job is queued, not `needs_approval`; Ask/Proceed in chat is M9); a run picks from the agent's team
+    pool, 5 leads by default; matches below 50 are dropped; the Leads page "Run outreach" uses the
+    lead's own agent, else the first teammate that drafts emails; Discard and Clear sent ask for a
+    second click; activity texts ("{agent} researched {lead}", "{agent} scored {lead} 85 (Hot)",
+    "{agent} drafted an email to {lead}", "Email to {lead} marked as sent").
+
 ## Next
 
-- **Milestone 7: jobs, engines and emails.** Wait for the owner to say go. First re-test the writing
-  model (see the Gemini note below).
+- **Milestone 8: lead search.** Wait for the owner to say go. It needs a Firecrawl account (tell the
+  owner the cost first) and a replacement for the gate model (see the Gemini note below).
 
 ## Running it on the owner's Windows computer
 
 - The app runs locally from a folder outside OneDrive. `.env.local` there has `AUTH_SECRET`,
-  `DATABASE_URL`, `GEMINI_API_KEY` and `GEMINI_MODEL` (never print or commit it).
+  `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL` and `CRON_SECRET` (never print or commit it).
 - Start it with `pnpm.cmd dev` (PowerShell blocks the plain `pnpm` script), then open
   http://localhost:3000.
 - Node.js is v26, which has no `corepack`. pnpm 11.3.0 was installed with `npm.cmd install -g`.
@@ -125,8 +161,11 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
   data to improve its products). Firecrawl (M8) and Vercel Pro (M10) are made when needed, with the
   cost told first.
 - **Gemini models (2026-11-26):** `gemini-2.5-flash` and `gemini-2.5-flash-lite` are closed to new
-  users. The owner chose `GEMINI_MODEL=gemini-3.5-flash` (set in `.env.local`; the plan allows this
-  override). It answered a JSON test once, then returned 503 "high demand" on later tries the same day.
-  Re-test it before M7. The M8 gate model needs a replacement too (`gemini-3.5-flash-lite` refused the
-  app's `thinkingBudget: 0` with a 400).
+  users. 3.5, 3.6, 3.7 and 3.8 Flash and "flash-latest" were mostly 503 "high demand" or timed out
+  on 2026-11-26. The owner chose **`GEMINI_MODEL=gemini-3-flash-preview`** (set in `.env.local`; the
+  plan allows this override): it answers in 1–3 s but sometimes stalls past the 30 s timeout, and the
+  free tier allows only **20 requests a day** for it. Billing (about $0.50 / $3.00 per 1M input /
+  output tokens; under 1 US cent per lead for four skills) was offered; the owner chose to wait for
+  now. Being a preview, re-check it before going online (M10). The M8 gate model needs a replacement
+  too (`gemini-3.5-flash-lite` refused the app's `thinkingBudget: 0` with a 400).
 - Messenger/Facebook DMs and email lookup are out of scope; the app never sends anything.

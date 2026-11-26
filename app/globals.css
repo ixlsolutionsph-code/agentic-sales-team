@@ -1465,3 +1465,90 @@ select.lp-input { appearance: auto; }
   .form-row { grid-template-columns: 1fr; }
   .inline-form .lp-input { width: 100%; }
 }
+
+/* ------------------------------------------------------------------
+   Agent work and emails (Milestone 7)
+   ------------------------------------------------------------------ */
+.run-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--bg-layer-1);
+  flex-wrap: wrap;
+}
+.run-row > div { flex: 1; min-width: 220px; display: grid; gap: 2px; }
+.is-error { color: var(--negative); }
+.draft-text {
+  margin: 0;
+  padding: 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-layer-1);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.draft-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.work-item { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); }
+.work-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.work-body summary { cursor: pointer; font-weight: 600; color: var(--accent); font-size: 14px; }
+.work-body[open] summary { margin-bottom: 8px; }
+.work-body .cell-sub { max-width: none; margin-top: 6px; }
+
+/* Tasks */
+.task-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.task-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+.task-row:last-child { border-bottom: 0; }
+.task-dot { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; flex: none; background: var(--gray-400); }
+.task-dot.is-running, .task-dot.is-queued { background: var(--accent); animation: task-pulse 1.2s ease-in-out infinite; }
+.task-dot.is-done { background: var(--positive); }
+.task-dot.is-failed { background: var(--negative); }
+.task-dot.is-needs_approval { background: var(--notice); }
+@keyframes task-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .task-dot.is-running, .task-dot.is-queued { animation: none; } }
+.task-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.task-main .cell-sub { max-width: none; }
+.task-items { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--text-muted); }
+.task-side { display: grid; justify-items: end; gap: 2px; flex: none; }
+.task-status { font-size: 13px; font-weight: 700; }
+
+/* /emails */
+.emails-page { display: grid; gap: 16px; }
+.emails-page .leads-filters { align-items: center; }
+.emails-page .leads-filters .lp-input { width: 240px; }
+.mail-split { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 16px; align-items: start; }
+.mail-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: calc(100vh - 220px); overflow-y: auto; }
+.mail-row {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mail-row:hover { border-color: var(--gray-400); }
+.mail-row.is-on { border-color: var(--accent); background: var(--accent-faint); }
+.mail-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.mail-subject { font-size: 14px; }
+.mail-view { display: grid; gap: 10px; padding: 20px; }
+.mail-view-subject { margin: 0; font-size: 20px; font-weight: 800; color: var(--gray-900); }
+.mail-view .cell-sub { max-width: none; margin: 0; }
+.mail-why { display: grid; gap: 4px; }
+.mail-why p { margin: 0; }
+.mail-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); }
+
+@media (max-width: 767px) {
+  .mail-split { grid-template-columns: 1fr; }
+  .mail-list { max-height: 260px; }
+  .emails-page .leads-filters .lp-input { width: 100%; }
+}
