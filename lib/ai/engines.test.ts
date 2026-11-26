@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ensureFitReason, oneLineFit } from "@/lib/leads/fit";
 import { FAIL_OPEN, assessLead } from "./assess";
 import type { AIJson, EngineAgent, EngineLead, EngineProduct } from "./engine";
-import { leadBlock, wordCount } from "./engine";
+import { SYSTEM_BASE, layoutLetter, leadBlock, toParagraphs, wordCount } from "./engine";
 import { cleanMatches, matchLead } from "./match";
 import { TEMPLATE_MARK, draftOutreach, outreachFallback, tidyBody } from "./outreach";
 import { cleanProductsUsed, draftProposal, proposalFallback } from "./proposal";
@@ -163,7 +163,11 @@ describe("proposal", () => {
   it("keeps only real product names and uses 0.5 / 900", async () => {
     expect(cleanProductsUsed(["nurse pack", "Made Up", "Nurse Pack"], products)).toEqual(["Nurse Pack"]);
     const f = fake({ title: "Staffing plan", body: "Body text", productsUsed: ["Nurse Pack", "Fake"] });
-    expect(await draftProposal(lead, agent, products, f.ai)).toEqual({ title: "Staffing plan", body: "Body text", productsUsed: ["Nurse Pack"] });
+    expect(await draftProposal(lead, agent, products, f.ai)).toEqual({
+      title: "Staffing plan",
+      body: "Dear Ana,\n\nBody text\n\nKind regards,\nMaya",
+      productsUsed: ["Nurse Pack"],
+    });
     expect(f.calls[0].opts).toEqual({ temperature: 0.5, maxTokens: 900 });
   });
 
@@ -180,5 +184,39 @@ describe("fit reason", () => {
     expect(ensureFitReason("", "Hiring nurses\nnow")).toBe("Hiring nurses now");
     expect(ensureFitReason("Already set", "New")).toBeNull();
     expect(ensureFitReason("", "")).toBeNull();
+  });
+});
+
+describe("letter layout and voice", () => {
+  it("writes as a member of the team, never as an AI", () => {
+    expect(SYSTEM_BASE).toContain("never mention AI");
+    expect(SYSTEM_BASE).not.toMatch(/AI sales agents/);
+  });
+
+  it("splits one long block into paragraphs without breaking at Dr. or Inc.", () => {
+    const block = "One. Two at Example Inc. stays here. Three. Dr. Cruz is four. Five. Six. Seven.";
+    expect(toParagraphs(block)).toBe("One. Two at Example Inc. stays here. Three.\n\nDr. Cruz is four. Five. Six.\n\nSeven.");
+    expect(toParagraphs("Short. Text.")).toBe("Short. Text.");
+    expect(toParagraphs("Has\n\nparagraphs. Already. Yes. Four. Five.")).toBe("Has\n\nparagraphs. Already. Yes. Four. Five.");
+  });
+
+  it("lays out a one-block proposal: greeting, paragraphs, sign-off", () => {
+    const one = "Dear Ms. Santos, A one. B two. C three. D four. E five. Kind regards, Maya";
+    expect(layoutLetter(one, "Maria", "Maya")).toBe("Dear Ms. Santos,\n\nA one. B two. C three.\n\nD four. E five.\n\nKind regards,\nMaya");
+    expect(layoutLetter("Body only.", "Maria", "Maya")).toBe("Dear Maria,\n\nBody only.\n\nKind regards,\nMaya");
+  });
+
+  it("proposal bodies from the model get the layout", async () => {
+    const f = fake({ title: "Plan", body: "Dear Ana, A one. B two. C three. D four. E five. Kind regards, Maya", productsUsed: [] });
+    const r = await draftProposal(lead, agent, products, f.ai);
+    expect(r.body).toBe("Dear Ana,\n\nA one. B two. C three.\n\nD four. E five.\n\nKind regards,\nMaya");
+    expect(f.calls[0].prompt).toContain("3 or 4 short paragraphs");
+  });
+});
+
+describe("sign-off spacing", () => {
+  it("puts the name right under the sign-off", () => {
+    const b = "Dear Ana,\n\nHello there.\n\nKind regards,\n\nMaya Santos";
+    expect(layoutLetter(b, "Ana", "Maya Santos")).toBe("Dear Ana,\n\nHello there.\n\nKind regards,\nMaya Santos");
   });
 });

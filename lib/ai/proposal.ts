@@ -1,7 +1,7 @@
 // Proposal: 150–250 words with 2–4 offerings from the catalog, each with its
 // name and price (01-prd.md §7.6). Temperature 0.5, 900 tokens, up to 5
 // products. Never invents products or prices. No AI: lists the catalog.
-import { SYSTEM_BASE, agentBlock, firstNameOf, leadBlock, productsBlock, str, type AIJson, type EngineAgent, type EngineLead, type EngineProduct } from "./engine";
+import { SYSTEM_BASE, agentBlock, firstNameOf, layoutLetter, leadBlock, productsBlock, str, type AIJson, type EngineAgent, type EngineLead, type EngineProduct } from "./engine";
 
 export type ProposalResult = { title: string; body: string; productsUsed: string[] };
 export const PROPOSAL_PRODUCTS = 5;
@@ -40,6 +40,7 @@ export async function draftProposal(lead: EngineLead, agent: EngineAgent, produc
     agentBlock(agent),
     `Write a short sales proposal for ${lead.name}${lead.company ? ` at ${lead.company}` : ""}. 150 to 250 words, plain text, formal.`,
     "Offer 2 to 4 of the products below that fit best, each by its exact name and with its exact price as listed. Never invent products, prices or features.",
+    `Layout: "Dear ${firstNameOf(lead.name) || "Sir or Madam"}," on its own line, then 3 or 4 short paragraphs separated by blank lines, then "Kind regards," and your name, ${agent.name}, on their own lines.`,
     "title: a short proposal title. productsUsed: the exact names of the products you offered.",
     "Lead:",
     leadBlock(lead),
@@ -51,7 +52,7 @@ export async function draftProposal(lead: EngineLead, agent: EngineAgent, produc
   if (!body) throw new Error("proposal: empty body");
   return {
     title: str(r?.title, 160) || `Proposal for ${lead.company || lead.name}`,
-    body,
+    body: layoutLetter(body, firstNameOf(lead.name), agent.name),
     productsUsed: cleanProductsUsed(r?.productsUsed, offered),
   };
 }

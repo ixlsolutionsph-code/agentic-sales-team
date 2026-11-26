@@ -8,6 +8,7 @@ import {
   agentBlock,
   clampScore,
   firstNameOf,
+  layoutLetter,
   leadBlock,
   productsBlock,
   str,
@@ -34,14 +35,7 @@ const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu;
 // [placeholders], the greeting and the signature.
 export function tidyBody(body: string, lead: EngineLead, agent: EngineAgent, isEmail: boolean): string {
   let b = body.replace(EMOJI, "").replace(/!+/g, ".").replace(/\[[^\]\n]{1,40}\]/g, "").replace(/[ \t]+\n/g, "\n").trim();
-  const first = firstNameOf(lead.name);
-  if (isEmail) {
-    // Greeting and sign-off on their own lines, even when the model wrote one block.
-    b = b.replace(/^(Dear [^,\n]{1,60},)[ \t]*(?=\S)/i, "$1\n\n");
-    b = b.replace(/(?<=\S)\s+(Sincerely|Kind regards|Best regards|Warm regards|Regards|Respectfully),[ \t]*(?=\S)/, "\n\n$1,\n");
-    if (!/^dear\b/i.test(b)) b = `Dear ${first || "there"},\n\n${b}`;
-    if (!b.slice(-120).includes(agent.name)) b = `${b}\n\nKind regards,\n${agent.name}`;
-  }
+  if (isEmail) b = layoutLetter(b, firstNameOf(lead.name) || "there", agent.name);
   return b.replace(/\n{3,}/g, "\n\n").trim();
 }
 

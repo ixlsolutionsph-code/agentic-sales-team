@@ -117,9 +117,12 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
   - Gemini's free tier allows only **20 requests a day** for `gemini-3-flash` per Google project, and
     some answers take 13 s or more (a few hit the 30 s limit and show "Failed"; a re-run picks them
     up). The owner has made three keys; the third (in `.env.local` now) finished the checks.
-  - Seen in testing, not changed: proposals come back as one block of text, and one proposal opened
-    with "I am writing to you as an AI sales agent" (the system prompt says the writer is one of the
-    business's AI sales agents). Ask the owner whether to change either.
+  - Changed after M7 at the owner's request (2026-11-26): the writing never mentions AI, bots or
+    "agents" (`SYSTEM_BASE` now says "write as a member of the team"), and emails and proposals are
+    laid out as letters ("Dear …," line, 3–4 short paragraphs, sign-off and name on their own lines)
+    by a prompt rule plus `layoutLetter` / `toParagraphs` in `lib/ai/engine.ts`. Checked with real
+    Gemini: 2 proposals (168 and 173 words) and 1 email (123 words), all laid out, real products and
+    prices, no AI mention. 177 unit tests pass.
   - Fixed while finishing check 1: with Gemini 3 models, `thinkingBudget: 0` sometimes stalled past
     30 s; `thinkingOff(model)` now sends `thinkingLevel: "minimal"` for Gemini 3+ (about 1.3 s) and
     keeps `thinkingBudget: 0` for 2.5. Emails written as one block now get the greeting and sign-off

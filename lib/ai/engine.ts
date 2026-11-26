@@ -19,7 +19,13 @@ export type EngineLead = {
 };
 export type EngineProduct = { id: string; name: string; description: string; price: string; category: string };
 
-export const SYSTEM_BASE = `You work for a small business as one of its AI sales agents. Be accurate and plain. ${UNTRUSTED_RULE}`;
+// The owner reviews and sends every message from their own mail, so the
+// writing is in the voice of a member of their team: it never mentions AI,
+// automation or "agents" (the owner's choice, 2026-11-26).
+export const SYSTEM_BASE =
+  "You work on the sales team of a small business. Be accurate and plain. " +
+  "In anything written for a lead (emails, messages, proposals), write as a member of the team: " +
+  `never mention AI, automation, bots or being an agent. ${UNTRUSTED_RULE}`;
 
 // The lead, cleaned and fenced, as the prompt sees it.
 export function leadBlock(l: EngineLead): string {
@@ -66,4 +72,40 @@ export const strList = (v: unknown, n: number, max: number) =>
 
 export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+const SIGN_OFF = /(?<=\S)\s+(Sincerely|Kind regards|Best regards|Warm regards|Regards|Respectfully|Yours sincerely),[ \t]*(?=\S)/;
+// Words ending in "." that don't end a sentence.
+const NOT_AN_END = /\b(Dr|Mr|Mrs|Ms|Prof|Inc|Co|Corp|Ltd|St|Jr|Sr|No|vs|e\.g|i\.e)\.$/i;
+
+// Splits one long block into paragraphs of about 3 sentences.
+export function toParagraphs(text: string, perParagraph = 3): string {
+  if (/\n\s*\n/.test(text)) return text; // already has paragraphs
+  const parts = text.split(/(?<=[.?])\s+(?=[A-Z"“(])/);
+  const sentences: string[] = [];
+  for (const p of parts) {
+    if (sentences.length && NOT_AN_END.test(sentences[sentences.length - 1])) sentences[sentences.length - 1] += ` ${p}`;
+    else sentences.push(p);
+  }
+  if (sentences.length <= perParagraph + 1) return text;
+  const out: string[] = [];
+  for (let i = 0; i < sentences.length; i += perParagraph) out.push(sentences.slice(i, i + perParagraph).join(" "));
+  return out.join("\n\n");
+}
+
+// Lays out a letter: "Dear …," on its own line, the body in short
+// paragraphs, the sign-off and name on their own lines. Adds the greeting
+// and signature when they are missing.
+export function layoutLetter(body: string, firstName: string, signer: string): string {
+  let b = body.replace(/[ \t]+\n/g, "\n").trim();
+  b = b.replace(/^(Dear [^,\n]{1,60},)[ \t]*(?=\S)/i, "$1\n\n");
+  b = b.replace(SIGN_OFF, "\n\n$1,\n");
+  if (!/^dear\b/i.test(b)) b = `Dear ${firstName || "Sir or Madam"},\n\n${b}`;
+  // The name goes right under the sign-off, with no blank line between.
+  b = b.replace(/\b(Sincerely|Kind regards|Best regards|Warm regards|Regards|Respectfully|Yours sincerely),[ \t]*\n\s*\n(?=\S)/i, "$1,\n");
+  if (!b.slice(-120).includes(signer)) b = `${b}\n\nKind regards,\n${signer}`;
+  // Paragraphs for the middle part only.
+  const m = b.match(/^(Dear [^\n]*\n\n)([\s\S]*?)(\n\n(?:Sincerely|Kind regards|Best regards|Warm regards|Regards|Respectfully|Yours sincerely),\n[\s\S]*)?$/i);
+  if (m) b = `${m[1]}${toParagraphs(m[2].trim())}${m[3] ?? ""}`;
+  return b.replace(/\n{3,}/g, "\n\n").trim();
 }
