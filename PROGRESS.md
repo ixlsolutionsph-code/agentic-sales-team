@@ -76,14 +76,37 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
     M9; the owner chose to leave it.
   - The owner's account now also has a real team and a second agent made from a gap; keep them.
 
+- **Milestone 6: catalog, leads and the AI transport.** Finished and checked on 2026-11-26.
+  - `lib/ai/{gemini,geminiShape,untrusted,vector}.ts` (raw fetch, no SDK, no retries; embeddings
+    `gemini-embedding-001`, 768 dims, normalised; `aiEmbedBatch` never throws), `lib/csv.ts` (own CSV
+    reader, no extra package), `lib/url/safeUrl.ts` (http(s) only, `platformOf`).
+  - Products: `lib/products/{shape,store,actions}.ts` (folders with ownership check, add, CSV ≤ 200 with
+    aliases and extra columns → `attributes`, move, delete, `searchProducts` = cosine + keyword merge,
+    `reembedProducts`), `/products` (`ProductsClient.tsx`). Opening Products fills missing embeddings.
+  - Leads: `lib/leads/{types,store,actions}.ts` (`LEAD_STAGES`, add, CSV ≤ 500 with per-agent email
+    dedupe, advance, accept / dismiss / all, hard delete, `listWorkbook`, `listLeadsForAgents`,
+    `knownLeadKeys`, nav counts, lead extras), `/leads` (`LeadsClient.tsx`: Active / Pending, filters,
+    modals, lead details). Activity `lead_added` on add and import.
+  - Search: `lib/search/{local,store,actions}.ts`, `components/GlobalSearch.tsx` (leads and products from
+    the server, 2+ chars, 200 ms). Sidebar badges: `lib/useNavCounts.ts` (30 s, focus, page change).
+  - All four M6 checks passed in the browser and the database with the owner's Gemini key (20-row CSV
+    with `location` → all embedded; meaning search, and keyword search with the key hidden; duplicate
+    email skipped; search finds a lead by company). 138 unit tests, lint and `pnpm build` pass. Test
+    account deleted.
+  - Choices where the docs are silent: keyword search skips common words and ranks by words matched;
+    lead CSV rows with no valid email are skipped; extra wording ("Skipped N rows…", "No leads match
+    these filters.", "Create an agent first…", the lead details window's empty texts).
+  - Sample files for the owner are in `Downloads/MD Files - Building Your Agentic Sales Team/Sample files/`.
+
 ## Next
 
-- **Milestone 6: products and leads.** Wait for the owner to say go.
+- **Milestone 7: jobs, engines and emails.** Wait for the owner to say go. First re-test the writing
+  model (see the Gemini note below).
 
 ## Running it on the owner's Windows computer
 
-- The app runs locally from a folder outside OneDrive. `.env.local` there has `AUTH_SECRET` and
-  `DATABASE_URL` (never print or commit it).
+- The app runs locally from a folder outside OneDrive. `.env.local` there has `AUTH_SECRET`,
+  `DATABASE_URL`, `GEMINI_API_KEY` and `GEMINI_MODEL` (never print or commit it).
 - Start it with `pnpm.cmd dev` (PowerShell blocks the plain `pnpm` script), then open
   http://localhost:3000.
 - Node.js is v26, which has no `corepack`. pnpm 11.3.0 was installed with `npm.cmd install -g`.
@@ -98,6 +121,12 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
 - The cloud environment **agentic-sales-team** also holds `DATABASE_URL` as an environment
   variable, and allows `api.ap-southeast-1.aws.neon.tech`.
 - The private preview link (claude.ai artifact) shows only the landing page; it cannot run sign-up.
-- Accounts: Neon made in M2. Gemini (M6), Firecrawl (M8), Vercel Pro (M10) are made when needed,
-  with the cost told first.
+- Accounts: Neon made in M2. Gemini key made in M6 (free tier, no billing; Google may use free-tier
+  data to improve its products). Firecrawl (M8) and Vercel Pro (M10) are made when needed, with the
+  cost told first.
+- **Gemini models (2026-11-26):** `gemini-2.5-flash` and `gemini-2.5-flash-lite` are closed to new
+  users. The owner chose `GEMINI_MODEL=gemini-3.5-flash` (set in `.env.local`; the plan allows this
+  override). It answered a JSON test once, then returned 503 "high demand" on later tries the same day.
+  Re-test it before M7. The M8 gate model needs a replacement too (`gemini-3.5-flash-lite` refused the
+  app's `thinkingBudget: 0` with a 400).
 - Messenger/Facebook DMs and email lookup are out of scope; the app never sends anything.

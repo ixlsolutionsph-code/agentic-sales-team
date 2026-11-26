@@ -7,13 +7,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { signOut } from "@/lib/auth/actions";
 import { callAction } from "@/lib/auth/call-action";
 import { css } from "@/lib/css";
-import { visibleAgents } from "@/lib/agents/derive";
 import { activeNav, badgeText, headerTitle, initialsOf, NAV_LINKS, type NavKey } from "@/lib/nav";
-import { noMatchesText, searchLocal } from "@/lib/search";
 import { useApp } from "@/lib/store";
 import { useDismiss, useMediaQuery } from "@/lib/useDismiss";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useNavCounts } from "@/lib/useNavCounts";
 import AppIcon, { type AppIconName } from "./AppIcon";
+import GlobalSearch from "./GlobalSearch";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 
 const NAV_ICONS: Record<NavKey, AppIconName> = {
@@ -34,6 +34,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const sideRef = useRef<HTMLElement>(null);
   const menuBtn = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
+  useNavCounts(pathname);
 
   // The drawer closes on every page change and when the screen gets wide.
   useEffect(() => setDrawer(false), [pathname]);
@@ -163,7 +164,7 @@ function Sidebar({
           <AppIcon name="search" />
         </button>
       ) : (
-        <SidebarSearch inputRef={searchInput} />
+        <GlobalSearch inputRef={searchInput} />
       )}
 
       <nav className="side-nav" aria-label="Main">
@@ -229,70 +230,6 @@ function Sidebar({
         <WorkspaceSwitcher collapsed={rail} />
         <AccountMenu rail={rail} />
       </div>
-    </div>
-  );
-}
-
-function SidebarSearch({ inputRef }: { inputRef: React.RefObject<HTMLInputElement> }) {
-  const { agents, teams, states, config } = useApp();
-  const router = useRouter();
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, open, () => setOpen(false));
-
-  const res = searchLocal(q, visibleAgents(agents, states, config), teams);
-  const show = open && q.trim().length > 0;
-  const none = res.agents.length === 0 && res.teams.length === 0;
-
-  function go(href: string) {
-    setOpen(false);
-    setQ("");
-    router.push(href);
-  }
-
-  return (
-    <div className="side-search" ref={ref} role="search">
-      <AppIcon name="search" size={16} className="side-search-icon" />
-      <input
-        ref={inputRef}
-        className="side-search-input"
-        type="search"
-        placeholder="Search"
-        aria-label="Search agents, teams, leads and products"
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            setOpen(false);
-            setQ("");
-          }
-        }}
-      />
-      {show ? (
-        <div className="menu search-results" role="listbox" aria-label="Search results">
-          {none ? <p className="menu-empty">{noMatchesText(q)}</p> : null}
-          {res.agents.length ? <div className="menu-heading">Agents</div> : null}
-          {res.agents.map((a) => (
-            <button key={a.id} type="button" role="option" aria-selected={false} className="menu-item" onClick={() => go(`/agents/${encodeURIComponent(a.id)}`)}>
-              <AppIcon name="bot" size={16} />
-              <span className="side-ellipsis">{a.name}</span>
-              <span className="menu-meta">{a.role}</span>
-            </button>
-          ))}
-          {res.teams.length ? <div className="menu-heading">Teams</div> : null}
-          {res.teams.map((t) => (
-            <button key={t.id} type="button" role="option" aria-selected={false} className="menu-item" onClick={() => go(`/teams/${encodeURIComponent(t.id)}`)}>
-              <AppIcon name="team" size={16} />
-              <span className="side-ellipsis">{t.name}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

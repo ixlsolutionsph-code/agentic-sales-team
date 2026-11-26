@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Agent, Team } from "./types";
-import { noMatchesText, searchLocal } from "./search";
+import type { Agent, Team } from "@/lib/types";
+import { noMatchesText, searchLocal, wantsServerSearch } from "./local";
 
 const agent = (id: string, name: string, role = "SDR") => ({ id, name, role }) as Agent;
 const team = (id: string, name: string) => ({ id, name }) as Team;
@@ -26,5 +26,12 @@ describe("global search (browser part)", () => {
 
   it("says when nothing matches", () => {
     expect(noMatchesText(" zed ")).toBe('No matches for "zed"');
+  });
+});
+
+describe("server search trigger", () => {
+  it("needs at least 2 characters", () => {
+    expect(wantsServerSearch(" a ")).toBe(false);
+    expect(wantsServerSearch("ab")).toBe(true);
   });
 });

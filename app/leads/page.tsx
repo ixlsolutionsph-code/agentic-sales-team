@@ -1,11 +1,7 @@
 import { requireUser } from "@/lib/auth/guard";
-import LeadsEmpty from "./LeadsEmpty";
+import LeadsClient from "./LeadsClient";
 
 export default async function LeadsPage() {
   await requireUser();
-  return (
-    <div className="page">
-      <LeadsEmpty />
-    </div>
-  );
+  return <LeadsClient />;
 }
