@@ -162,9 +162,30 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
   - Only search result titles, descriptions and links are read; pages are never fetched. A lead's link is
     always one of Firecrawl's results, and an email is kept only when it is written in that result.
 
+- **Milestone 9: team chat and the chain.** Built and checked on 2026-11-27 (built in parallel by three
+  helpers: relay `lib/pod/*`, chat brain `lib/chat/*` + `lib/ai/{intent,resolveLeads}.ts`, screens
+  `app/chats/*`, `app/ChatHome.tsx`, `lib/useTeamChat.ts`, team page approvals, sidebar unread). 290 unit
+  tests, lint and `pnpm build` pass. The owner now has paid Gemini credits.
+  - Shared pieces: `lib/chat/markers.ts` (⟦kind:payload⟧ cards), `lib/chat/teamMessages.ts`,
+    `lib/chat/contract.ts`, `lib/pod/types.ts`. Runners call `chainAfterRun` after each pod job.
+  - Checked live (7-agent test team, since deleted): search card → Proceed → live timeline → Assessor
+    hand-off with Proceed → Cancel at research posts the summary; with every skill on Auto the chain ran
+    research → scoring → matching → 5 emails → 5 proposals and ended "@You, the proposals are ready for you
+    to review and send."; "@Maya find leads" handed to the Scout; "any updates?" and "how many hot leads?"
+    answered from data; a search with no fit stopped and offered a wider search; message 301 refused.
+  - Fixed while testing: a vague "find leads" no longer fills "who" with "leads" (`isVagueWhat`); chat
+    searches no longer add the agent's goal to the request; a typed "stop" right after a step finished now
+    stops the hand-off too (`flagRecentRunJobs` + a re-check in `chainNext`); hidden labels stretched the
+    chat page (`.chat-scroll` is now `position: relative`).
+  - Meetings in chat are answered as "not available yet" until Milestone 10. Run state: a run is the
+    jobs sharing `params.runId`; Cancel flags running steps `stopped`, Clear chat flags them `cleared`.
+  - Known small things: a refused message (daily limit) stays on screen until reload; a name pill's
+    padding looks like a space before a following comma.
+
 ## Next
 
-- **Milestone 9: team chat and the chain.** Wait for the owner to say go.
+- **Milestone 10: meetings, notifications and going live.** Wait for the owner to say go. It needs a
+  Vercel account (tell the owner the cost first).
 
 ## Running it on the owner's Windows computer
 

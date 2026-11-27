@@ -133,3 +133,61 @@ export async function leadsWithOpenDraft(workspaceId: string, leadIds: string[])
       AND lead_id IN (SELECT (jsonb_array_elements_text(${JSON.stringify(leadIds)}::jsonb))::uuid)`);
   return (r.rows as Row[]).map((x) => s(x.lead_id));
 }
+
+// ---------------------------------------------------------------- the chain (Milestone 9)
+
+export type TeamMember = { id: string; name: string; capabilities: string[]; paused: boolean };
+
+// A team with its live members in team order (team_members overrides
+// teams.members; deleted agents are left out). Null when the team doesn't
+// exist in this workspace.
+export async function loadTeamMembers(workspaceId: string, teamId: string): Promise<{ id: string; name: string; members: TeamMember[] } | null> {
+  const db = requireDb();
+  const t = await db.execute(sql`
+    SELECT t.id, t.name, COALESCE(m.members, t.members) AS members
+    FROM teams t
+    LEFT JOIN team_members m ON m.user_id = t.user_id AND m.team_id = t.id
+    WHERE t.user_id = ${workspaceId}::uuid AND t.id = ${teamId}`);
+  const row = t.rows[0] as Row | undefined;
+  if (!row) return null;
+  const ids = Array.isArray(row.members) ? (row.members as unknown[]).map(String) : [];
+  if (!ids.length) return { id: s(row.id), name: s(row.name), members: [] };
+  const a = await db.execute(sql`
+    SELECT a.id, a.name, a.capabilities, COALESCE(st.paused, false) AS paused
+    FROM agents a
+    LEFT JOIN agent_states st ON st.user_id = a.user_id AND st.agent_id = a.id
+    WHERE a.user_id = ${workspaceId}::uuid
+      AND a.id IN (SELECT jsonb_array_elements_text(${JSON.stringify(ids)}::jsonb))
+      AND COALESCE(st.removed, false) = false`);
+  const byId = new Map<string, TeamMember>();
+  for (const x of a.rows as Row[]) {
+    byId.set(s(x.id), {
+      id: s(x.id),
+      name: s(x.name),
+      capabilities: Array.isArray(x.capabilities) ? (x.capabilities as unknown[]).map(String) : [],
+      paused: x.paused === true,
+    });
+  }
+  const members: TeamMember[] = [];
+  for (const id of ids) {
+    const m = byId.get(id);
+    if (m && !members.some((x) => x.id === id)) members.push(m);
+  }
+  return { id: s(row.id), name: s(row.name), members };
+}
+
+// The account that owns a workspace (daily limits count per account), or null.
+export async function workspaceOwner(workspaceId: string): Promise<string | null> {
+  const db = requireDb();
+  const r = await db.execute(sql`SELECT owner_id FROM workspaces WHERE id = ${workspaceId}::uuid`);
+  const v = (r.rows[0] as Row | undefined)?.owner_id;
+  return v == null ? null : s(v);
+}
+
+// The agent's per-capability settings (agent_config.settings), or null.
+export async function loadAgentSettings(workspaceId: string, agentId: string): Promise<Record<string, Record<string, unknown>> | null> {
+  const db = requireDb();
+  const r = await db.execute(sql`SELECT settings FROM agent_config WHERE user_id = ${workspaceId}::uuid AND agent_id = ${agentId}`);
+  const v = (r.rows[0] as Row | undefined)?.settings;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, Record<string, unknown>>) : null;
+}

@@ -33,6 +33,7 @@ import {
   msgCantRun,
 } from "./limits";
 import { DeadlineError, budget, withDeadline } from "./runtime";
+import { chainAfterRun } from "@/lib/pod/orchestrate";
 import { claimJobById, claimNextJob, finishJob, reapStaleJobs, writeSteps, type JobRow } from "./store";
 
 // The lead search runner (01-prd.md §7.3): plan → search → gate → extract →
@@ -140,7 +141,9 @@ export async function runScrapeJob(job: JobRow): Promise<void> {
     const key = searchKey();
     const target = Math.min(SEARCH_TARGET.max, Math.max(SEARCH_TARGET.min, Math.floor(Number(job.params.target) || SEARCH_TARGET.default)));
     const useAI = isAIConfigured();
-    const fullInstruction = agent.goal ? `${instruction}. Our goal: ${agent.goal}` : instruction;
+    // From the agent page the agent's goal helps; a chat search already carries
+    // the product and place the owner chose, so the goal would only mislead it.
+    const fullInstruction = agent.goal && !job.params.pod ? `${instruction}. Our goal: ${agent.goal}` : instruction;
 
     // 1. Plan
     log.set({ id: "plan", status: "active", label: "Planning the search" });
@@ -236,6 +239,8 @@ export async function runScrapeJob(job: JobRow): Promise<void> {
     await log.flush().catch(() => {});
     await finishJob(job.id, "failed", { ...counts, leadIds }, msg).catch((err) => console.error("finishJob failed", err));
   }
+  // The chain (Milestone 9): post the result and hand on. Never throws.
+  await chainAfterRun(job);
 }
 
 // POST /api/scrape: runs one queued search of this workspace now.

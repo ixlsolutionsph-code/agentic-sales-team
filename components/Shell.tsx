@@ -6,12 +6,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { signOut } from "@/lib/auth/actions";
 import { callAction } from "@/lib/auth/call-action";
+import { clearChat } from "@/lib/chat/actions";
+import { anyUnread } from "@/lib/chat/thread";
 import { css } from "@/lib/css";
 import { activeNav, badgeText, headerTitle, initialsOf, NAV_LINKS, type NavKey } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import { useDismiss, useMediaQuery } from "@/lib/useDismiss";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { useNavCounts } from "@/lib/useNavCounts";
+import { CHAT_CLEARED_EVENT, useChatUnread } from "@/lib/useTeamChat";
+import type { Team } from "@/lib/types";
 import AppIcon, { type AppIconName } from "./AppIcon";
 import GlobalSearch from "./GlobalSearch";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
@@ -35,6 +39,11 @@ export default function Shell({ children }: { children: ReactNode }) {
   const menuBtn = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   useNavCounts(pathname);
+  const { activeChatTeam } = useApp();
+  const unread = useChatUnread();
+  // The open chat is not counted for the dot on the browser tab.
+  const openTeam = pathname === "/chats" || pathname.startsWith("/chats/") ? activeChatTeam : null;
+  useTabDot(anyUnread(unread, openTeam));
 
   // The drawer closes on every page change and when the screen gets wide.
   useEffect(() => setDrawer(false), [pathname]);
@@ -70,6 +79,8 @@ export default function Shell({ children }: { children: ReactNode }) {
       >
         <Sidebar
           pathname={pathname}
+          unread={unread}
+          openTeam={openTeam}
           rail={rail}
           mobile={mobile}
           searchInput={searchInput}
@@ -115,6 +126,8 @@ export default function Shell({ children }: { children: ReactNode }) {
 
 function Sidebar({
   pathname,
+  unread,
+  openTeam,
   rail,
   mobile,
   searchInput,
@@ -123,6 +136,8 @@ function Sidebar({
   onRailSearch,
 }: {
   pathname: string;
+  unread: Record<string, number>;
+  openTeam: string | null;
   rail: boolean;
   mobile: boolean;
   searchInput: React.RefObject<HTMLInputElement>;
@@ -130,8 +145,7 @@ function Sidebar({
   onCloseDrawer: () => void;
   onRailSearch: () => void;
 }) {
-  const { teams, navCounts, setActiveChatTeam } = useApp();
-  const router = useRouter();
+  const { teams, navCounts } = useApp();
   const active = activeNav(pathname);
   const counts: Partial<Record<NavKey, number>> = { leads: navCounts.leads, emails: navCounts.emails };
 
@@ -203,22 +217,7 @@ function Sidebar({
         {teams.length ? (
           <ul className="side-chats">
             {teams.map((t) => (
-              <li key={t.id}>
-                {/* The team is held in memory: a chat has no bookmarkable link (01-prd.md §12). */}
-                <button
-                  type="button"
-                  className="side-item"
-                  title={rail ? t.name : undefined}
-                  aria-label={rail ? t.name : undefined}
-                  onClick={() => {
-                    setActiveChatTeam(t.id);
-                    router.push("/chats");
-                  }}
-                >
-                  <AppIcon name="chat" />
-                  <span className="side-label side-ellipsis">{t.name}</span>
-                </button>
-              </li>
+              <ChatRow key={t.id} team={t} rail={rail} count={openTeam === t.id ? 0 : unread[t.id] ?? 0} open={openTeam === t.id} />
             ))}
           </ul>
         ) : (
@@ -232,6 +231,133 @@ function Sidebar({
       </div>
     </div>
   );
+}
+
+// One Recent chats row: the team name, its unread count ("99+" cap) and, on
+// hover, a trash button that asks "Delete history?" before clearing the chat.
+function ChatRow({ team, rail, count, open }: { team: Team; rail: boolean; count: number; open: boolean }) {
+  const { setActiveChatTeam, setChatThread, showToast } = useApp();
+  const router = useRouter();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const badge = badgeText(count);
+
+  async function onDelete() {
+    setBusy(true);
+    const res = await callAction(() => clearChat(team.id));
+    setBusy(false);
+    if (!res.ok) return showToast(res.error, true);
+    setConfirm(false);
+    setChatThread(team.id, null);
+    window.dispatchEvent(new CustomEvent(CHAT_CLEARED_EVENT, { detail: team.id }));
+    showToast(`${team.name} chat history deleted`);
+  }
+
+  if (confirm && !rail) {
+    return (
+      <li className="side-chat-confirm" role="group" aria-label={`Delete ${team.name} chat history`}>
+        <span className="side-chat-confirm-text">Delete history?</span>
+        <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={onDelete}>
+          Delete
+        </button>
+        <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setConfirm(false)}>
+          Cancel
+        </button>
+      </li>
+    );
+  }
+
+  const label = badge ? `${team.name}, ${badge} unread` : team.name;
+  return (
+    <li className="side-chat">
+      {/* The team is held in memory: a chat has no bookmarkable link (01-prd.md §12). */}
+      <button
+        type="button"
+        className={css("side-item", open && "is-active")}
+        title={rail ? label : undefined}
+        aria-label={rail || badge ? label : undefined}
+        aria-current={open ? "page" : undefined}
+        onClick={() => {
+          setActiveChatTeam(team.id);
+          router.push("/chats");
+        }}
+      >
+        <AppIcon name="chat" />
+        <span className="side-label side-ellipsis">{team.name}</span>
+        {badge ? <span className="side-badge side-chat-badge">{badge}</span> : null}
+      </button>
+      {rail ? null : (
+        <button
+          type="button"
+          className="icon-btn side-chat-trash"
+          aria-label={`Delete ${team.name} chat history`}
+          title="Delete history"
+          onClick={() => setConfirm(true)}
+        >
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M3 6h18" />
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          </svg>
+        </button>
+      )}
+    </li>
+  );
+}
+
+// A red dot on the browser tab's icon while another team has unread messages.
+const FAVICON = "/logo-mark.png";
+function useTabDot(on: boolean) {
+  const dotted = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const links = () => Array.from(document.querySelectorAll<HTMLLinkElement>("link[rel~='icon']"));
+    const setHref = (href: string) => {
+      const list = links();
+      if (!list.length) {
+        const l = document.createElement("link");
+        l.rel = "icon";
+        document.head.appendChild(l);
+        list.push(l);
+      }
+      for (const l of list) l.href = href;
+    };
+    if (!on) {
+      if (dotted.current) setHref(FAVICON);
+      dotted.current = null;
+      return;
+    }
+    const draw = (img: HTMLImageElement | null) => {
+      if (cancelled) return;
+      const c = document.createElement("canvas");
+      c.width = 32;
+      c.height = 32;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      if (img) ctx.drawImage(img, 0, 0, 32, 32);
+      ctx.beginPath();
+      ctx.arc(24, 8, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "#d73220";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      try {
+        const url = c.toDataURL("image/png");
+        dotted.current = url;
+        setHref(url);
+      } catch {
+        // A blocked canvas: leave the icon as it is.
+      }
+    };
+    const img = new window.Image();
+    img.onload = () => draw(img);
+    img.onerror = () => draw(null);
+    img.src = FAVICON;
+    return () => {
+      cancelled = true;
+    };
+  }, [on]);
 }
 
 function AccountMenu({ rail }: { rail: boolean }) {

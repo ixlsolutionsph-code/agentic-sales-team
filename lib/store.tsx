@@ -98,6 +98,8 @@ export type AppActions = {
   setTeamModal: (patch: Partial<Omit<TeamModalFields, "open">>) => void;
   closeTeamModal: () => void;
   setActiveChatTeam: (teamId: string | null) => void;
+  // Replaces one team's chat thread (null removes it). Used by the team chat.
+  setChatThread: (teamId: string, messages: ChatMessage[] | null) => void;
   // Agents. createAgent waits for the save; the others change the screen at
   // once and undo the change (with an error message) if saving fails.
   createAgent: (input: NewAgentInput, settings: CapSettings | null) => Promise<ActionResult<Agent>>;
@@ -183,6 +185,8 @@ export function AppProvider({
       setTeamModal: (patch) => setTeamModalState((cur) => ({ ...cur, ...patch })),
       closeTeamModal: () => setTeamModalState(EMPTY_TEAM_MODAL),
       setActiveChatTeam,
+      setChatThread: (teamId, messages) =>
+        setListsState((cur) => ({ ...cur, chats: restoreKey(cur.chats, teamId, messages ?? undefined) })),
       createAgent: async (input, settings) => {
         const res = await callAction(() => saveAgentAction({ ...input, settings }));
         if (res.ok && res.data) {

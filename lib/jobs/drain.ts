@@ -34,6 +34,7 @@ import {
   type JobKind,
 } from "./limits";
 import { CLAIM_BUDGET_MS, LEAD_BUDGET_MS, PER_LEAD_MS, budget, withDeadline } from "./runtime";
+import { chainAfterRun } from "@/lib/pod/orchestrate";
 import { claimNextJob, finishJob, reapStaleJobs, writeSteps, type JobRow } from "./store";
 
 // The job runner (01-prd.md §7.5): claims queued jobs one at a time and works
@@ -178,6 +179,8 @@ export async function runJob(job: JobRow): Promise<void> {
     await log.flush().catch(() => {});
     await finishJob(job.id, "failed", counts, userMessage(e, job.kind)).catch((err) => console.error("finishJob failed", err));
   }
+  // The chain (Milestone 9): post the result and hand on. Never throws.
+  await chainAfterRun(job);
 }
 
 // Works through queued jobs: first fails stale ones, then claims and runs

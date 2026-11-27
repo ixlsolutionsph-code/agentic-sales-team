@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
 import { Btn } from "@/components/primitives";
 import { AgentAvatar, StatusPill } from "@/components/agents/AgentBits";
 import { CoverageChip, IconPicker, SoonChip, TeamIcon } from "@/components/teams/TeamBits";
 import { agentNow, teamKpis, teamSubtitle, visibleAgents, workingCount } from "@/lib/agents/derive";
+import { callAction } from "@/lib/auth/call-action";
+import type { PendingApproval } from "@/lib/chat/contract";
 import { css } from "@/lib/css";
+import { approveJob, listPendingApprovals, rejectJob } from "@/lib/pod/actions";
+import { kickJob } from "@/lib/useTeamChat";
 import { useApp } from "@/lib/store";
 import { membersOfTeam } from "@/lib/teams/membership";
 import { TEAM_GOAL_MAX, TEAM_NAME_MAX, coverage, teamTemplate } from "@/lib/teams/new";
@@ -19,7 +23,7 @@ import { loadTeamLeads } from "@/lib/workspace/actions";
 
 type TeamLead = Awaited<ReturnType<typeof loadTeamLeads>>["leads"][number];
 
-// /teams/[id] (02-sitemap.md §6). Pending approvals come in Milestone 9.
+// /teams/[id] (02-sitemap.md §6).
 export default function TeamDetail({ id }: { id: string }) {
   const { teams } = useApp();
   const team = teams.find((t) => t.id === id);
@@ -231,6 +235,8 @@ function TeamView({ team }: { team: Team }) {
         <p className="team-goal">{team.goal ? <>🎯 {team.goal}</> : <span className="sub-empty-text">No shared goal yet. Use Edit to add one.</span>}</p>
       </section>
 
+      <PendingApprovals teamId={team.id} />
+
       <section className="card team-card-sec" aria-labelledby="sec-activity">
         <h3 className="agent-section-title" id="sec-activity">
           Recent activity
@@ -254,6 +260,68 @@ function TeamView({ team }: { team: Team }) {
       <EditTeamModal team={team} open={editOpen} onClose={() => setEditOpen(false)} />
       <AddAgentsModal team={team} memberIds={memberIds} open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
+  );
+}
+
+// Steps of this team waiting for a go-ahead. Approve queues the step and
+// kicks the runner; Reject stops it (and the team's other waiting steps).
+function PendingApprovals({ teamId }: { teamId: string }) {
+  const { showToast } = useApp();
+  const [list, setList] = useState<PendingApproval[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    const l = await listPendingApprovals(teamId).catch(() => null);
+    setList(l ?? []);
+  }, [teamId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  async function decide(p: PendingApproval, approve: boolean) {
+    setBusy(p.jobId);
+    const res = await callAction(() => (approve ? approveJob(p.jobId) : rejectJob(p.jobId)));
+    setBusy(null);
+    if (!res.ok) {
+      showToast(res.error, true);
+    } else {
+      for (const j of res.data?.follow ?? []) void kickJob(j);
+      showToast(approve ? "Approved" : "Rejected");
+    }
+    void reload();
+  }
+
+  return (
+    <section className="card team-card-sec" aria-labelledby="sec-approvals">
+      <h3 className="agent-section-title" id="sec-approvals">
+        Pending approvals
+      </h3>
+      {list === null ? (
+        <p className="sub-empty-text">Loading…</p>
+      ) : list.length ? (
+        <ul className="team-approvals">
+          {list.map((p) => (
+            <li key={p.jobId} className="team-approval">
+              <div className="team-approval-text">
+                <span className="cell-main">{p.agentName}</span>
+                <span className="cell-sub">{p.text}</span>
+              </div>
+              <div className="team-approval-actions">
+                <button type="button" className="btn btn-sm btn-accent" disabled={busy !== null} onClick={() => decide(p, true)}>
+                  Approve
+                </button>
+                <button type="button" className="btn btn-sm" disabled={busy !== null} onClick={() => decide(p, false)}>
+                  Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="sub-empty-text">Nothing is waiting for your approval.</p>
+      )}
+    </section>
   );
 }
 
