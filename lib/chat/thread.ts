@@ -1,6 +1,7 @@
 // The team chat thread on the client: merging, cards and text pieces. Pure,
 // so it can be unit tested (05-build-guide.md M9).
 import type { ChatMessage } from "@/lib/types";
+import type { MeetPick } from "./clarify";
 import { findMarker, parseMarkers, readJsonMarker, stripMarkers, type Offer, type ScrapeBriefCard, type WritePick } from "./markers";
 
 export { stripMarkers };
@@ -137,6 +138,7 @@ export type Cards = {
   leads: string[]; // lead ids
   scrape: ScrapeBriefCard | null;
   writepick: WritePick | null;
+  meetpick: MeetPick | null;
   replies: string[];
   offer: Offer | null;
 };
@@ -160,13 +162,14 @@ export function cardsOf(text: string): Cards {
     leads,
     scrape: readJsonMarker<ScrapeBriefCard>(text, "scrape"),
     writepick: readJsonMarker<WritePick>(text, "writepick"),
+    meetpick: readJsonMarker<MeetPick>(text, "meetpick"),
     replies: list,
     offer,
   };
 }
 
 export function hasCards(c: Cards): boolean {
-  return !!(c.approve || c.run || c.leads.length || c.scrape || c.writepick || c.replies.length);
+  return !!(c.approve || c.run || c.leads.length || c.scrape || c.writepick || c.meetpick || c.replies.length);
 }
 
 // Job ids of ⟦run⟧ markers in some messages (to follow chain hand-offs).

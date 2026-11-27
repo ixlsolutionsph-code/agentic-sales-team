@@ -1,13 +1,12 @@
 import { requireUser } from "@/lib/auth/guard";
-import CalendarEmpty from "./CalendarEmpty";
+import CalendarView from "./CalendarView";
 
-// Milestone 10 adds meetings, the summary cards and the Week / Month views.
-// Until then: an empty week grid (02-sitemap.md: "No meetings: an empty grid").
+// The calendar (02-sitemap.md): only booked meetings, by week or month.
 export default async function CalendarPage() {
   await requireUser();
   return (
     <div className="page">
-      <CalendarEmpty />
+      <CalendarView />
     </div>
   );
 }

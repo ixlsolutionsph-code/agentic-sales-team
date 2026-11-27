@@ -201,7 +201,8 @@ describe("routing", () => {
       text: "No agent can research leads yet. Create an agent with that capability, and I will send requests to it.",
     });
     expect(resolve("follow-up", team, null, [team])).toMatchObject({ kind: "soon", text: "Follow-ups isn't available yet, so I'm unable to run it at the moment." });
-    expect(resolve("book-meeting", team, null, [team])).toMatchObject({ kind: "soon", text: "Meeting booking isn't available yet, so I'm unable to run it at the moment." });
+    // Meetings run from the chat since Milestone 10.
+    expect(resolve("book-meeting", team, null, [team]).kind).not.toBe("soon");
   });
   it("prefers a live teammate over a paused one", () => {
     const paused = agent("xp", "Pat", ["scrape"], true);

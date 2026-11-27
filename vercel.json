@@ -1,7 +1,7 @@
 {
   "regions": ["sin1"],
   "crons": [
-    { "path": "/api/cron/jobs", "schedule": "* * * * *" },
-    { "path": "/api/cron/scrape", "schedule": "* * * * *" }
+    { "path": "/api/cron/jobs", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/scrape", "schedule": "0 0 * * *" }
   ]
 }

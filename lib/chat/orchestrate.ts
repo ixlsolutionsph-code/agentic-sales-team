@@ -16,9 +16,8 @@ export type ChatAgent = {
 };
 export type ChatTeam = { id: string; name: string; goal: string; members: ChatAgent[] };
 
-// Capabilities that can't run from the chat yet. book-meeting runs in
-// Milestone 10; until then it is answered like a "soon" capability.
-export const CHAT_SOON = new Set(["book-meeting"]);
+// Capabilities that can't run from the chat yet (none since Milestone 10).
+export const CHAT_SOON = new Set<string>();
 export function isChatReady(cap: string): boolean {
   return isEngineReady(cap) && !CHAT_SOON.has(cap);
 }

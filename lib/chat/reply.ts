@@ -13,7 +13,11 @@ import { enqueuePodStage } from "@/lib/pod/orchestrate";
 import { isPodStage } from "@/lib/pod/types";
 import type { ChatMessage } from "@/lib/types";
 import { inAccountWorkspaces } from "@/lib/workspaces/scope";
-import { latestQuestion, readScrapeAnswer, readWriteAnswer, type OpenQuestion } from "./clarify";
+import { latestQuestion, readMeetAnswer, readScrapeAnswer, readWriteAnswer, type OpenQuestion } from "./clarify";
+import { dayLabel, daySlots, parseMeetingTime, safeTimeZone, whenChoices } from "@/lib/ai/meetingTime";
+import { namesText, proposeMeeting } from "@/lib/meetings/book";
+import { bookingRules, meetableLeads } from "@/lib/meetings/store";
+import { jsonMarker, marker, repliesMarker } from "./markers";
 import type { ChatResult, FollowJob } from "./contract";
 import { converse } from "./converse";
 import type { ScrapeBrief } from "./markers";
@@ -83,6 +87,7 @@ type Ctx = {
   thread: ChatMessage[]; // before the user's message, oldest first
   follow: FollowJob[];
   ai: AIJson | null;
+  tz: string; // the owner's time zone, for meeting times
 };
 
 const aiFn = (): AIJson | null => (isAIConfigured() ? (system, prompt, schema, opts) => aiJSON(system, prompt, schema, opts) : null);
@@ -106,6 +111,7 @@ export async function runTeamChat(
   teamId: string,
   message: string,
   leadIds: string[] = [],
+  timeZone = "UTC",
 ): Promise<ActionResult<ChatResult>> {
   const text = String(message ?? "").trim();
   if (!text) return { ok: false, error: MSG_EMPTY };
@@ -139,6 +145,7 @@ export async function runTeamChat(
     thread,
     follow: [],
     ai: aiFn(),
+    tz: safeTimeZone(timeZone),
   };
   try {
     await dispatch(ctx);
@@ -179,7 +186,9 @@ async function dispatch(ctx: Ctx): Promise<void> {
 async function reply(ctx: Ctx, q: OpenQuestion | null, yn: "yes" | "no" | null): Promise<void> {
   // A card answer still continues its question, even after other messages.
   const cardAnswer =
-    (q?.kind === "scrape" && readScrapeAnswer(ctx.text) != null) || (q?.kind === "writepick" && readWriteAnswer(ctx.text) != null);
+    (q?.kind === "scrape" && readScrapeAnswer(ctx.text) != null) ||
+    (q?.kind === "writepick" && readWriteAnswer(ctx.text) != null) ||
+    (q?.kind === "meetpick" && readMeetAnswer(ctx.text) != null);
   const open = q && (!q.answered || cardAnswer) ? q : null;
 
   if (open?.kind === "offer") {
@@ -190,6 +199,9 @@ async function reply(ctx: Ctx, q: OpenQuestion | null, yn: "yes" | "no" | null):
   }
   if (open?.kind === "scrape" || open?.kind === "writepick") {
     if (await continueQuestion(ctx, open, yn)) return;
+  }
+  if (open?.kind === "meetpick" || open?.kind === "meet") {
+    if (await continueMeeting(ctx, open, yn)) return;
   }
   // A typed "stop" with no question open stops the team's waiting steps.
   if (isStopWord(ctx.text)) {
@@ -312,6 +324,91 @@ async function continueOutreach(ctx: Ctx, agent: ChatAgent, actTeam: ChatTeam, i
   return runStage(ctx, agent, actTeam, "outreach", pool.map((l) => l.id), namesSummary(pool.map((l) => l.name)));
 }
 
+// ---- Meetings (01-prd.md §7.4 "Meetings in chat", J5) ----
+
+export const MSG_NO_MEET_LEADS = "You have no accepted leads to meet yet. Accept some leads first, then ask me again.";
+export const MSG_MEET_WHO = "Who should I set the meeting with, and when? Here are your best leads.";
+const DAY_WORDS = /\b(today|tonight|tomorrow|tmrw|next|mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\d{4}-\d{2}-\d{2}/i;
+
+// Who and when. Leads come from the picker, /lead picks or names in the
+// message; with none, the picker of the best leads is shown. Then the time is
+// read; a day with no time gets hourly slots; a full time goes to
+// proposeMeeting (Ask posts Proceed, Auto books).
+async function meetingFlow(ctx: Ctx, agent: ChatAgent, actTeam: ChatTeam, chosen: { id: string; name: string }[] | null, whenText: string): Promise<void> {
+  let leads = chosen ?? [];
+  if (!chosen) {
+    if (ctx.picks.length) leads = ctx.picks;
+    else {
+      const pool = (await poolLeadNames(ctx.ws, memberIds(actTeam))).filter((l) => l.review === "accepted");
+      const found = matchLeadNames(ctx.plain, pool);
+      leads = found.map((id) => ({ id, name: pool.find((l) => l.id === id)?.name ?? "" }));
+    }
+  }
+  if (!leads.length) {
+    const list = await meetableLeads(ctx.ws, memberIds(actTeam));
+    if (!list.length) return post(ctx, agent.id, MSG_NO_MEET_LEADS);
+    return post(ctx, agent.id, `${MSG_MEET_WHO}${jsonMarker("meetpick", { leads: list, when: await choicesFor(ctx, agent.id) })}`);
+  }
+  const ids = leads.map((l) => l.id).join(",");
+  const names = namesText(leads.map((l) => l.name));
+  const when = whenText.trim() ? await parseMeetingTime(whenText, new Date(), ctx.tz, ctx.ai) : null;
+  if (!when) {
+    return post(ctx, agent.id, `When should I set the meeting with ${names}?${marker("meet", `${ids}|`)}${repliesMarker(await choicesFor(ctx, agent.id))}`);
+  }
+  if (!when.hasTime) {
+    const rules = await bookingRules(ctx.ws, agent.id);
+    const slots = daySlots(when.date, rules, ctx.tz, new Date());
+    if (!slots.length) {
+      return post(ctx, agent.id, `I have no open times on ${dayLabel(when.date, ctx.tz)}. Pick another day.${marker("meet", `${ids}|`)}${repliesMarker(await choicesFor(ctx, agent.id))}`);
+    }
+    return post(ctx, agent.id, `What time on ${dayLabel(when.date, ctx.tz)} should I set the meeting with ${names}?${marker("meet", `${ids}|${when.date}`)}${repliesMarker(slots.map((x) => x.label))}`);
+  }
+  const err = await proposeMeeting(ctx.ws, ctx.accountId, { teamId: actTeam.id, agentId: agent.id, agentName: agent.name, leads, whenAt: when.iso, timeZone: ctx.tz });
+  if (err) return post(ctx, agent.id, `${err}${marker("meet", `${ids}|`)}${repliesMarker(await choicesFor(ctx, agent.id))}`);
+}
+
+async function choicesFor(ctx: Ctx, agentId: string): Promise<string[]> {
+  return whenChoices(await bookingRules(ctx.ws, agentId), ctx.tz, new Date());
+}
+
+// An open meeting picker or "when?" question.
+async function continueMeeting(ctx: Ctx, open: Extract<OpenQuestion, { kind: "meetpick" | "meet" }>, yn: "yes" | "no" | null): Promise<boolean> {
+  const agent = agentById(ctx, open.msg.who);
+  if (!agent) return false;
+  const actTeam = teamOfAgent(agent.id, ctx.team, ctx.world);
+  const inPool = async (ids: string[]) => (await poolLeadsByIds(ctx.ws, memberIds(actTeam), ids.filter((x) => UUID_RE.test(x)))).map((l) => ({ id: l.id, name: l.name }));
+  if (open.kind === "meetpick") {
+    const answer = readMeetAnswer(ctx.text);
+    if (answer) {
+      const leads = await inPool(answer.ids);
+      if (!leads.length) return post(ctx, agent.id, MSG_MEET_WHO + jsonMarker("meetpick", open.pick)).then(() => true);
+      await meetingFlow(ctx, agent, actTeam, leads, answer.when);
+      return true;
+    }
+  }
+  if (open.answered) return false;
+  if (yn === "no" || isStopWord(ctx.text)) {
+    await post(ctx, agent.id, MSG_QUESTION_STOPPED);
+    return true;
+  }
+  if (looksLikeQuestion(ctx.text)) {
+    await answerQuestion(ctx, agent);
+    await post(ctx, agent.id, open.msg.text);
+    return true;
+  }
+  if (!ctx.plain) return false;
+  if (open.kind === "meetpick") {
+    const named = ctx.picks.length ? ctx.picks.map((p) => p.id) : matchLeadNames(ctx.text, open.pick.leads);
+    if (!named.length) return false;
+    await meetingFlow(ctx, agent, actTeam, await inPool(named), ctx.plain);
+    return true;
+  }
+  if (isNewRequest(ctx.plain, "book-meeting")) return false;
+  const text = open.date && !DAY_WORDS.test(ctx.plain) ? `${open.date} ${ctx.plain}` : ctx.plain;
+  await meetingFlow(ctx, agent, actTeam, await inPool(open.ids), text);
+  return true;
+}
+
 // ---- Routing ----
 
 async function route(ctx: Ctx, intent: Intent, mentioned: ChatAgent | null): Promise<void> {
@@ -336,6 +433,7 @@ async function routeCap(ctx: Ctx, cap: string, mentioned: ChatAgent | null, inte
 }
 
 async function act(ctx: Ctx, agent: ChatAgent, actTeam: ChatTeam, cap: string, intent: Intent | null): Promise<void> {
+  if (cap === "book-meeting") return meetingFlow(ctx, agent, actTeam, null, ctx.plain);
   if (cap === "scrape") {
     const products = await briefProducts(ctx.ws);
     const brief = intent ? briefFromIntent(intent, ctx.plain, products) : { asks: 0 };

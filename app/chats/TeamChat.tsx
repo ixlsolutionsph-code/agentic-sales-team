@@ -29,6 +29,7 @@ import type { Agent, Team } from "@/lib/types";
 import { useTeamChat } from "@/lib/useTeamChat";
 import ApprovalButtons from "./ApprovalButtons";
 import LeadPicker from "./LeadPicker";
+import MeetPicker from "./MeetPicker";
 import QuickReplies from "./QuickReplies";
 import RunCard from "./RunCard";
 import ScrapeQuestions from "./ScrapeQuestions";
@@ -303,6 +304,7 @@ function Cards({
       {c.leads.length ? <ScrapeResults teamId={teamId} ids={c.leads} /> : null}
       {c.scrape ? <ScrapeQuestions card={c.scrape} disabled={disabled} onSend={onSend} /> : null}
       {c.writepick ? <LeadPicker pick={c.writepick} disabled={disabled} onSend={onSend} /> : null}
+      {c.meetpick ? <MeetPicker pick={c.meetpick} disabled={disabled} onSend={onSend} /> : null}
       {approveOpen && c.approve ? <ApprovalButtons jobId={c.approve} disabled={disabled} onDecide={onDecide} /> : null}
       {c.replies.length ? <QuickReplies replies={c.replies} disabled={disabled} onSend={onSend} /> : null}
     </div>

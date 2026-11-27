@@ -182,10 +182,29 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
   - Known small things: a refused message (daily limit) stays on screen until reload; a name pill's
     padding looks like a space before a following comma.
 
+- **Milestone 10: meetings, the calendar and the bell.** Built and checked on 2026-11-27. 304 unit tests,
+  lint and `pnpm build` pass. Going online (Vercel) is not done yet.
+  - Built: `lib/ai/meetingTime.ts` (AI at temp 0 with the next 14 days and UTC offsets; simple reader
+    fallback, bare 1–7 = PM; `bookingProblem`, `meetingLabel`, `daySlots`, `whenChoices`, `safeTimeZone`),
+    `lib/meetings/{store,book,actions}.ts` (book on Proceed or Auto; lead → `meeting`; activity
+    `meeting_booked`), the chat meeting flow in `lib/chat/reply.ts` (who picker ⟦meetpick⟧, when question
+    ⟦meet:ids|date⟧ with quick replies, slots, ask text), `app/chats/MeetPicker.tsx`, the lead details
+    "Book a meeting" box (books at once), `app/calendar/CalendarView.tsx` (cards, Week / Month, ‹ Today ›),
+    `components/NotificationsBell.tsx` + `lib/activity/*` (12 rows, 30 s, Clear all, ×, badge since last
+    opened), `README.md`. Unread badges and the favicon red dot came with Milestone 9.
+  - Checked live (test account, since deleted): "tomorrow 8pm" on a Friday refused (weekdays only);
+    "Monday 8pm" refused (outside 9 AM–5 PM); "Monday 2pm" asked Proceed, booked, and showed on the
+    week view, the month view and the cards; the bell showed the booking and Clear all emptied it; a
+    message in another team showed an unread badge and the red favicon dot.
+  - Choices where the docs are silent: when tomorrow can't be booked, the time buttons name the next
+    working day ("Monday 10 AM"); the calendar has a "Today" button; wording of the refusal texts,
+    "Done. I booked a … It's on your calendar.", "You have no accepted leads to meet yet…".
+
 ## Next
 
-- **Milestone 10: meetings, notifications and going live.** Wait for the owner to say go. It needs a
-  Vercel account (tell the owner the cost first).
+- **Going online (Milestone 10, last part).** The owner chose Vercel **Hobby (free)** on 2026-11-27.
+  `vercel.json` crons now run once a day (`0 0 * * *`), as Hobby requires; work moves while a tab is open.
+  The deploy check "a search finishes with the tab closed" can't pass on Hobby (needs Pro and `* * * * *`).
 
 ## Running it on the owner's Windows computer
 

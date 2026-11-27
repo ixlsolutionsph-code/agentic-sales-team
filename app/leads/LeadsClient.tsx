@@ -29,6 +29,7 @@ import {
   type Lead,
   type LeadStage,
 } from "@/lib/leads/types";
+import { bookMeetingForLead } from "@/lib/meetings/actions";
 import { refreshNavCounts } from "@/lib/navCountsEvent";
 import { loadTasks, startRun } from "@/lib/jobs/actions";
 import { teammatesOf } from "@/lib/teams/membership";
@@ -363,6 +364,7 @@ export default function LeadsClient() {
         agentName={openLead ? agentName(openLead.agentId) : ""}
         onClose={() => setOpenId(null)}
         onReview={(review) => openLead && onReview([openLead.id], review)}
+        onBooked={load}
       />
     </div>
   );
@@ -587,11 +589,13 @@ function LeadDetails({
   agentName,
   onClose,
   onReview,
+  onBooked,
 }: {
   lead: Lead | null;
   agentName: string;
   onClose: () => void;
   onReview: (review: "accepted" | "dismissed") => void;
+  onBooked: () => void;
 }) {
   const [extras, setExtras] = useState<LeadExtras | null>(null);
   const id = lead?.id ?? null;
@@ -716,6 +720,8 @@ function LeadDetails({
           )}
         </section>
 
+        <BookMeetingBox leadId={lead.id} onBooked={onBooked} />
+
         {lead.review === "pending" ? (
           <div className="agent-head-actions">
             <Btn variant="primary" onClick={() => onReview("accepted")}>
@@ -733,5 +739,52 @@ function LeadDetails({
         ) : null}
       </div>
     </Modal>
+  );
+}
+
+// "Book a meeting" on the lead (03-user-journey.md J5): type a time in plain
+// words; it books at once inside the booking agent's hours.
+function BookMeetingBox({ leadId, onBooked }: { leadId: string; onBooked: () => void }) {
+  const { showToast } = useApp();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function book(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || !text.trim()) return;
+    setBusy(true);
+    setError("");
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const res = await callAction(() => bookMeetingForLead(leadId, text, tz));
+    setBusy(false);
+    if (!res.ok || !res.data) return setError(res.ok ? "Something went wrong. Please try again." : res.error);
+    setText("");
+    showToast(`Meeting booked for ${res.data.label}`);
+    onBooked();
+  }
+
+  return (
+    <section className="lead-sec">
+      <h3 className="sub-title">Book a meeting</h3>
+      <form className="meet-box" onSubmit={book}>
+        <label className="sr-only" htmlFor={`meet-${leadId}`}>
+          When should the meeting be?
+        </label>
+        <input
+          id={`meet-${leadId}`}
+          className="lp-input"
+          placeholder="For example: tomorrow 2pm"
+          value={text}
+          maxLength={200}
+          onChange={(e) => setText(e.target.value)}
+          aria-invalid={error ? true : undefined}
+        />
+        <Btn type="submit" variant="primary" disabled={busy || !text.trim()}>
+          {busy ? "Booking…" : "Book"}
+        </Btn>
+      </form>
+      {error ? <p className="auth-error" role="alert">{error}</p> : null}
+    </section>
   );
 }

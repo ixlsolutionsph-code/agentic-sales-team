@@ -1729,3 +1729,41 @@ select.lp-input { appearance: auto; }
 @media (prefers-reduced-motion: reduce) {
   .chat-dots span { animation: none; opacity: 0.7; }
 }
+
+/* ------------------------------------------------------------------
+   Meetings and calendar (Milestone 10)
+   ------------------------------------------------------------------ */
+.meet-box { display: flex; gap: 8px; align-items: center; }
+.meet-box .lp-input { flex: 1; min-width: 0; }
+.cal-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.cal-card { display: grid; gap: 4px; padding: 14px 16px; }
+.cal-card-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+.cal-card-value { font-size: 26px; font-weight: 800; color: var(--gray-900); }
+.cal-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cal-nav { display: flex; align-items: center; gap: 4px; }
+.cal-nav .icon-btn { font-size: 22px; line-height: 1; }
+.cal-cell { padding: 2px; display: grid; align-content: start; gap: 2px; }
+.cal-meet { padding: 2px 6px; border-radius: var(--r-sm); background: var(--accent-subtle); color: var(--accent-hover); font-size: 12px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.cal-meet-time { font-weight: 800; }
+.cal-month { display: grid; grid-template-columns: repeat(7, minmax(84px, 1fr)); min-width: 620px; }
+.cal-month-dow { padding: 8px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--bg-layer-1); border-bottom: 1px solid var(--border); }
+.cal-month-cell { min-height: 84px; padding: 6px 8px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); display: grid; align-content: start; gap: 6px; }
+.cal-month-cell:nth-child(7n + 1) { border-left: 0; }
+.cal-month-cell.is-other { background: var(--bg-layer-1); color: var(--text-muted); }
+.cal-month-date { font-weight: 700; font-size: 14px; }
+.cal-month-cell.is-today .cal-month-date { color: #fff; background: var(--accent); border-radius: 50%; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.cal-dots { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.cal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.cal-more { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+@media (max-width: 767px) { .cal-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bell-btn { position: relative; }
+.bell-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: #f43f7e; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
+.bell-panel { width: min(360px, 92vw); padding: 6px; }
+.bell-head { display: flex; align-items: center; justify-content: space-between; padding-right: 8px; }
+.bell-head .link-btn { font-size: 13px; font-weight: 600; color: var(--accent); }
+.bell-list { list-style: none; margin: 0; padding: 0; display: grid; max-height: 60vh; overflow-y: auto; }
+.bell-row { display: flex; align-items: flex-start; gap: 4px; border-radius: var(--r-md); }
+.bell-row:hover { background: var(--bg-layer-1); }
+.bell-link { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 8px 10px; color: var(--text); text-decoration: none; font-size: 14px; }
+.bell-x { flex: none; width: 28px; height: 28px; margin: 6px 4px 0 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
+.bell-x:hover { background: var(--gray-100); color: var(--text); }

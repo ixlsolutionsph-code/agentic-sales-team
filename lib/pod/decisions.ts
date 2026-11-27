@@ -2,6 +2,7 @@ import "server-only";
 import type { ChatMessage } from "@/lib/types";
 import type { FollowJob } from "@/lib/chat/contract";
 import { postTeamMessage } from "@/lib/chat/teamMessages";
+import { bookFromJob } from "@/lib/meetings/book";
 import {
   dismissTeamOpenJobs,
   flagRecentRunJobs,
@@ -16,7 +17,6 @@ import { MSG_ALREADY_HANDLED, MSG_WONT_BOOK, cancelSummary, startText } from "./
 
 // Proceed and Cancel (01-prd.md §7.5, 03-user-journey.md J6).
 
-const MSG_MEETING_NOT_READY = "Meeting booking isn't available yet, so I'm unable to run it at the moment.";
 
 // Proceed: needs_approval → queued, posts the start text. Returns the posted
 // messages and the job to follow.
@@ -24,7 +24,13 @@ export async function approveStep(workspaceId: string, jobId: string): Promise<{
   const job = await getJob(workspaceId, jobId);
   if (!job || job.status !== "needs_approval") return { messages: [], follow: null, error: MSG_ALREADY_HANDLED };
   // book-meeting books on Proceed; that flow comes with meetings (Milestone 10).
-  if (job.kind === "book-meeting") return { messages: [], follow: null, error: MSG_MEETING_NOT_READY };
+  // book-meeting has no runner: Proceed books it here.
+  if (job.kind === "book-meeting") {
+    const running = await moveJobStatus(workspaceId, jobId, "needs_approval", "running");
+    if (!running) return { messages: [], follow: null, error: MSG_ALREADY_HANDLED };
+    await bookFromJob(workspaceId, running);
+    return { messages: [], follow: null };
+  }
   const queued = await moveJobStatus(workspaceId, jobId, "needs_approval", "queued");
   if (!queued) return { messages: [], follow: null, error: MSG_ALREADY_HANDLED };
   const messages: ChatMessage[] = [];

@@ -16,13 +16,12 @@ const isTeamId = (v: unknown): v is string => typeof v === "string" && v.length 
 // The server entry (01-prd.md §7.4). `message` may carry ⟦answer:…⟧ or
 // ⟦writeanswer:…⟧ from a card. `leadIds` come from /lead picks.
 export async function teamChat(teamId: string, message: string, leadIds?: string[], timeZone?: string): Promise<ActionResult<ChatResult>> {
-  void timeZone; // used by meeting times (Milestone 10)
   const s = await getSession();
   if (!s) return { ok: false, error: NOT_SIGNED_IN };
   if (!isTeamId(teamId)) return { ok: false, error: NO_TEAM };
   const text = typeof message === "string" ? message : "";
   if (text.length > MSG_MAX_CHARS) return { ok: false, error: MSG_TOO_LONG };
-  return runTeamChat(s.userId, s.accountId, teamId, text, Array.isArray(leadIds) ? leadIds : []);
+  return runTeamChat(s.userId, s.accountId, teamId, text, Array.isArray(leadIds) ? leadIds : [], typeof timeZone === "string" ? timeZone : "UTC");
 }
 
 // The thread after a cursor (0 = all).

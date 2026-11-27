@@ -71,15 +71,44 @@ export function readWriteAnswer(text: string): WriteAnswer | null {
   return { ids };
 }
 
+// 3. Meeting picker (⟦meetpick:…⟧, Milestone 10). The user message is
+//      "Meet «Ana Cruz» · Tomorrow 2 PM⟦meetanswer:<urlencoded JSON>⟧"
+//    JSON: { ids: string[], when: string } (when may be ""). Build it with
+//    `meetAnswerMessage(picks, when)`. A "when?" question (⟦meet:ids|date⟧)
+//    is answered with plain text or its quick replies.
+export type MeetPick = { leads: { id: string; name: string; company: string; score: number }[]; when?: string[] };
+export type MeetAnswer = { ids: string[]; when: string };
+
+export function meetAnswerMessage(picks: { id: string; name: string }[], when: string): string {
+  const names = picks.map((p) => `«${p.name.replace(/[«»⟦⟧]/g, "")}»`).join(", ");
+  const answer: MeetAnswer = { ids: picks.map((p) => p.id), when: when.trim().slice(0, 80) };
+  return `Meet ${names}${answer.when ? ` · ${answer.when}` : ""}${jsonMarker("meetanswer", answer)}`;
+}
+
+export function readMeetAnswer(text: string): MeetAnswer | null {
+  const a = readJsonMarker<MeetAnswer>(text, "meetanswer");
+  if (!a || !Array.isArray(a.ids)) return null;
+  const ids = [...new Set(a.ids.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length < 64))].slice(0, 25);
+  return { ids, when: typeof a.when === "string" ? a.when.slice(0, 80) : "" };
+}
+
+// ⟦meet:<id,id>|<yyyy-mm-dd or empty>⟧
+export function readMeetQuestion(payload: string): { ids: string[]; date: string } {
+  const [ids, date] = payload.split("|");
+  return { ids: (ids ?? "").split(",").filter(Boolean), date: /^\d{4}-\d{2}-\d{2}$/.test(date ?? "") ? date : "" };
+}
+
 // ---- Open questions ----
 
 export type OpenQuestion =
   | { kind: "approve"; msg: ChatMessage; jobId: string; answered: boolean }
   | { kind: "scrape"; msg: ChatMessage; card: ScrapeBriefCard; answered: boolean }
   | { kind: "writepick"; msg: ChatMessage; pick: WritePick; answered: boolean }
+  | { kind: "meetpick"; msg: ChatMessage; pick: MeetPick; answered: boolean }
+  | { kind: "meet"; msg: ChatMessage; ids: string[]; date: string; answered: boolean }
   | { kind: "offer"; msg: ChatMessage; offer: Offer; answered: boolean };
 
-const QUESTION_KINDS = new Set(["approve", "scrape", "writepick", "offer"]);
+const QUESTION_KINDS = new Set(["approve", "scrape", "writepick", "meetpick", "meet", "offer"]);
 
 // The latest agent question in the thread (newest message that carries an
 // approve, scrape, writepick or offer marker, from an agent or the system).
@@ -105,6 +134,15 @@ export function latestQuestion(thread: ChatMessage[]): OpenQuestion | null {
       const pick = readJsonMarker<WritePick>(msg.text, "writepick");
       if (pick && Array.isArray(pick.leads)) return { kind: "writepick", msg, pick, answered };
       return null;
+    }
+    if (kinds.includes("meetpick")) {
+      const pick = readJsonMarker<MeetPick>(msg.text, "meetpick");
+      if (pick && Array.isArray(pick.leads)) return { kind: "meetpick", msg, pick, answered };
+      return null;
+    }
+    if (kinds.includes("meet")) {
+      const q = readMeetQuestion(parseMarkers(msg.text).find((m) => m.kind === "meet")!.payload);
+      return { kind: "meet", msg, ids: q.ids, date: q.date, answered };
     }
     const offer = readJsonMarker<Offer>(msg.text, "offer");
     if (offer && (offer.kind === "wider-search" || offer.kind === "action")) return { kind: "offer", msg, offer, answered };

@@ -18,6 +18,7 @@ import { CHAT_CLEARED_EVENT, useChatUnread } from "@/lib/useTeamChat";
 import type { Team } from "@/lib/types";
 import AppIcon, { type AppIconName } from "./AppIcon";
 import GlobalSearch from "./GlobalSearch";
+import NotificationsBell from "./NotificationsBell";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 
 const NAV_ICONS: Record<NavKey, AppIconName> = {
@@ -413,30 +414,3 @@ function AccountMenu({ rail }: { rail: boolean }) {
   );
 }
 
-// The bell. Activity comes in Milestone 10; until then the panel is empty.
-function NotificationsBell() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, open, () => setOpen(false));
-
-  return (
-    <div className="menu-wrap" ref={ref}>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label="Notifications"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <AppIcon name="bell" size={20} />
-      </button>
-      {open ? (
-        <div className="menu menu-right bell-panel" role="dialog" aria-label="Notifications">
-          <div className="menu-heading">Notifications</div>
-          <p className="menu-empty">No recent activity.</p>
-        </div>
-      ) : null}
-    </div>
-  );
-}
