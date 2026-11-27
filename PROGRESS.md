@@ -137,15 +137,40 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
     second click; activity texts ("{agent} researched {lead}", "{agent} scored {lead} 85 (Hot)",
     "{agent} drafted an email to {lead}", "Email to {lead} marked as sent").
 
+- **Milestone 8: lead search.** Built and checked on 2026-11-27; all five checks pass. 192 unit tests, lint
+  and `pnpm build` pass.
+  - Built: `lib/scrape/{firecrawl,gate,rules}.ts` (plan → Firecrawl `/v2/search` → gate → extract → normalise),
+    `lib/jobs/scrape.ts` (runner with the 45 s deadline, `addScrapedLeads`, `runScrapeNow`, `drainScrape`),
+    `claimJobById` / `getJob` in `lib/jobs/store.ts`, `app/api/scrape` and the real `app/api/cron/scrape`,
+    actions `startSearch` and `getScrapeProgress`, `app/chats/ScrapeProgress.tsx` (live timeline, 1.2 s poll,
+    stops at 3 min), `app/agents/[id]/FindLeads.tsx` (browser prompt, target 10, runs at once).
+  - Gate model: **`gemini-3.5-flash-lite`** (`GATE_MODEL` in `lib/scrape/gate.ts`). `gemini-2.5-flash-lite`
+    answers 404 "no longer available to new users" and Google points to 3.5 Flash-Lite (about 1.2 s).
+  - `FIRECRAWL_API_KEY` is in `.env.local` (free plan: 1,000 credits a month; one search uses about 12).
+    Each Firecrawl search took 9–12 s; a whole lead search took 20–25 s.
+  - Checks (test account, since deleted): "HR managers at hospitals in Manila" (fit) saved 10 pending
+    LinkedIn leads, each with a fit line; running it again saved 2 new ones and no duplicates; "people
+    looking for a virtual assistant in Texas" (intent) saved 2 (most Facebook results are VA sellers, which
+    the gate drops); the timeline shows plan, search, gate with dropped sources, extract, save; with no
+    Firecrawl key the job fails with "Lead search isn't set up…"; the 21st search in 24 h is refused.
+  - Choices where the docs are silent: the agent's goal is added to the request; sources the team already
+    has are left out before extraction (so a repeat search finds new people); the gate also gets the job-post
+    and agency rules, and is told a company of the kind we look for is never a competitor; extraction keeps
+    a post that doesn't say where the person is; with no AI each search result becomes a pending lead; leads
+    belong to the Scout (`leadOwnerForTeam`); activity text "{agent} found N new leads"; the messages "Tell
+    me what leads to look for.", key refused, out of credits, and search down.
+  - Only search result titles, descriptions and links are read; pages are never fetched. A lead's link is
+    always one of Firecrawl's results, and an email is kept only when it is written in that result.
+
 ## Next
 
-- **Milestone 8: lead search.** Wait for the owner to say go. It needs a Firecrawl account (tell the
-  owner the cost first) and a replacement for the gate model (see the Gemini note below).
+- **Milestone 9: team chat and the chain.** Wait for the owner to say go.
 
 ## Running it on the owner's Windows computer
 
 - The app runs locally from a folder outside OneDrive. `.env.local` there has `AUTH_SECRET`,
-  `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL` and `CRON_SECRET` (never print or commit it).
+  `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `CRON_SECRET` and `FIRECRAWL_API_KEY` (never print
+  or commit it).
 - Start it with `pnpm.cmd dev` (PowerShell blocks the plain `pnpm` script), then open
   http://localhost:3000.
 - Node.js is v26, which has no `corepack`. pnpm 11.3.0 was installed with `npm.cmd install -g`.
@@ -169,6 +194,6 @@ Where the build is, so a new session can pick up. Talk to the owner as `AGENTS.m
   plan allows this override): it answers in 1–3 s but sometimes stalls past the 30 s timeout, and the
   free tier allows only **20 requests a day** for it. Billing (about $0.50 / $3.00 per 1M input /
   output tokens; under 1 US cent per lead for four skills) was offered; the owner chose to wait for
-  now. Being a preview, re-check it before going online (M10). The M8 gate model needs a replacement
+  now. Being a preview, re-check it before going online (M10). The M8 gate model was later replaced (see Milestone 8); before that it needed a replacement
   too (`gemini-3.5-flash-lite` refused the app's `thinkingBudget: 0` with a 400).
 - Messenger/Facebook DMs and email lookup are out of scope; the app never sends anything.

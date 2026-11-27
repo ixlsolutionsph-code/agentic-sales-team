@@ -21,6 +21,7 @@ export type JobParams = {
   teamId?: string;
   pod?: boolean;
   leadCount?: number;
+  target?: number; // lead search: how many leads to find
 };
 
 export type JobRow = {
@@ -106,6 +107,23 @@ export async function claimNextJob(workspaceId: string | null, kinds: readonly J
       FOR UPDATE SKIP LOCKED
     ) AND status = 'queued'
     RETURNING *`);
+  return r.rows.length ? toJob(r.rows[0] as Row) : null;
+}
+
+// Claims one queued job of this workspace by id (the browser's "run this
+// search now"). Null when it is not queued any more.
+export async function claimJobById(workspaceId: string, jobId: string, kind: JobKind): Promise<JobRow | null> {
+  const db = requireDb();
+  const r = await db.execute(sql`
+    UPDATE jobs SET status = 'running', started_at = now()
+    WHERE id = ${jobId}::uuid AND user_id = ${workspaceId}::uuid AND kind = ${kind} AND status = 'queued'
+    RETURNING *`);
+  return r.rows.length ? toJob(r.rows[0] as Row) : null;
+}
+
+export async function getJob(workspaceId: string, jobId: string): Promise<JobRow | null> {
+  const db = requireDb();
+  const r = await db.execute(sql`SELECT * FROM jobs WHERE id = ${jobId}::uuid AND user_id = ${workspaceId}::uuid`);
   return r.rows.length ? toJob(r.rows[0] as Row) : null;
 }
 

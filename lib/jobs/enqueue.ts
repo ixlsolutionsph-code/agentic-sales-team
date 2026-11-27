@@ -14,8 +14,10 @@ import {
   MSG_OPEN_DRAFT,
   MSG_RUNS_LIMIT,
   MSG_SEARCHES_LIMIT,
+  MSG_SEARCH_NEEDS_TEXT,
   MSG_TOO_MANY_LEADS,
   RUNS_PER_DAY,
+  SEARCH_TARGET,
   SEARCHES_PER_DAY,
   msgCantRun,
   type JobKind,
@@ -31,6 +33,7 @@ export type EnqueueInput = {
   ask?: boolean; // true: wait for Proceed (needs_approval)
   teamId?: string;
   pod?: boolean;
+  target?: number; // lead search: how many leads to find (1–25)
 };
 
 // Queues a run after the checks in 01-prd.md §7.5, in order: the agent is
@@ -51,8 +54,10 @@ export async function enqueueJob(workspaceId: string, accountId: string, input: 
   const used = await countRecentRuns(workspaces.length ? workspaces : [workspaceId], searches ? "searches" : "runs");
   if (used >= (searches ? SEARCHES_PER_DAY : RUNS_PER_DAY)) return searches ? MSG_SEARCHES_LIMIT : MSG_RUNS_LIMIT;
 
+  if (searches && !instruction) return MSG_SEARCH_NEEDS_TEXT;
   const batchSize = Math.min(MAX_LEADS_PER_RUN, Math.max(1, Math.floor(input.batchSize ?? DEFAULT_BATCH)));
-  const leadCount = leadIds?.length ?? batchSize;
+  const target = Math.min(SEARCH_TARGET.max, Math.max(SEARCH_TARGET.min, Math.floor(input.target ?? SEARCH_TARGET.default)));
+  const leadCount = searches ? target : (leadIds?.length ?? batchSize);
   return insertJob(workspaceId, {
     agentId: agent.id,
     kind: input.kind,
@@ -65,6 +70,7 @@ export async function enqueueJob(workspaceId: string, accountId: string, input: 
       ...(instruction ? { instruction } : {}),
       ...(input.teamId ? { teamId: input.teamId } : {}),
       ...(input.pod ? { pod: true } : {}),
+      ...(searches ? { target } : {}),
     },
   });
 }

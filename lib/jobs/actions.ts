@@ -9,8 +9,9 @@ import { MSG } from "@/lib/auth/rules";
 import { agentWorkStats, listDrafts, listProposals, type AgentWorkStats, type Draft, type Proposal } from "@/lib/emails/store";
 import { UUID_RE } from "@/lib/products/shape";
 import { enqueueJob, enqueueOutreachJob } from "./enqueue";
-import { MAX_LEADS_PER_RUN, MSG_TOO_MANY_LEADS, RUNNABLE_KINDS, type JobKind } from "./limits";
-import { getJobs, listAgentJobs } from "./store";
+import type { Step } from "@/lib/scrape/steps";
+import { MAX_LEADS_PER_RUN, MSG_SEARCH_FAILED, MSG_TOO_MANY_LEADS, RUNNABLE_KINDS, SEARCH_TARGET, type JobKind } from "./limits";
+import { getJob, getJobs, listAgentJobs } from "./store";
 import { toTask, type Task } from "./tasks";
 
 const fail = (error: string): ActionResult<never> => ({ ok: false, error });
@@ -80,5 +81,55 @@ export async function loadTasks(jobIds: string[]): Promise<Task[]> {
   } catch (e) {
     console.error("loadTasks failed", e);
     return [];
+  }
+}
+
+// Queues a lead search from the agent page (target 10). Pressing Find leads
+// is the go-ahead, so it is queued at once; the browser then calls
+// POST /api/scrape with the job id.
+export async function startSearch(input: { agentId: string; instruction: string }): Promise<ActionResult<{ jobId: string }>> {
+  const s = await getSession();
+  if (!s) return fail(MSG.serverDown);
+  if (!input || typeof input.agentId !== "string" || !AGENT_ID_RE.test(input.agentId)) return fail(TRY_AGAIN);
+  if (typeof input.instruction !== "string") return fail(TRY_AGAIN);
+  try {
+    const res = await enqueueJob(s.userId, s.accountId, { agentId: input.agentId, kind: "scrape", instruction: input.instruction, target: SEARCH_TARGET.default });
+    return typeof res === "string" ? fail(res) : { ok: true, data: { jobId: res.id } };
+  } catch (e) {
+    console.error("startSearch failed", e);
+    return fail(MSG.serverDown);
+  }
+}
+
+export type ScrapeProgress = {
+  status: string;
+  steps: Step[];
+  leadsFound: number;
+  sources: number;
+  dropped: number;
+  error: string | null;
+};
+
+// The live timeline of one search. Only the user-facing message is returned
+// for a failed search, never a raw error.
+export async function getScrapeProgress(jobId: string): Promise<ScrapeProgress | null> {
+  try {
+    const s = await getSession();
+    if (!s || typeof jobId !== "string" || !UUID_RE.test(jobId)) return null;
+    const job = await getJob(s.userId, jobId);
+    if (!job || job.kind !== "scrape") return null;
+    const r = job.result ?? {};
+    const num = (k: string) => Number(r[k]) || 0;
+    return {
+      status: job.status,
+      steps: Array.isArray(r.steps) ? (r.steps as Step[]) : [],
+      leadsFound: num("leadsFound"),
+      sources: num("sources"),
+      dropped: num("dropped"),
+      error: job.status === "failed" ? job.error || MSG_SEARCH_FAILED : null,
+    };
+  } catch (e) {
+    console.error("getScrapeProgress failed", e);
+    return null;
   }
 }

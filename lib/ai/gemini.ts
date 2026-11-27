@@ -62,16 +62,17 @@ export async function aiGenerate(
   return readGenerateReply(json);
 }
 
-// JSON that follows `schema`. Default temperature 0.6, up to 700 tokens.
+// JSON that follows `schema`. Default temperature 0.6, up to 700 tokens,
+// 30 s unless `timeoutMs` is given.
 export async function aiJSON<T>(
   system: string,
   prompt: string,
   schema: Record<string, unknown>,
-  opts: Partial<GenOpts> & { model?: string } = {},
+  opts: Partial<GenOpts> & { model?: string; timeoutMs?: number } = {},
 ): Promise<T> {
   const o = { temperature: opts.temperature ?? 0.6, maxTokens: opts.maxTokens ?? 700 };
   const m = model(opts.model);
-  const json = await post(`${GEMINI_BASE}/${m}:generateContent`, generateBody(system, prompt, o, schema, m), GEN_TIMEOUT_MS);
+  const json = await post(`${GEMINI_BASE}/${m}:generateContent`, generateBody(system, prompt, o, schema, m), opts.timeoutMs ?? GEN_TIMEOUT_MS);
   return parseJSONReply<T>(readGenerateReply(json));
 }
 

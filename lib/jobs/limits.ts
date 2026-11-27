@@ -31,6 +31,11 @@ export const MSG_SEARCH_FAILED = "That search didn't complete. Please try again.
 export const MSG_TIMED_OUT = "Timed out: the run was stopped before it finished.";
 export const MSG_OPEN_DRAFT = "This lead already has a draft. Open it in Emails.";
 export const MSG_NO_PRODUCTS = "Add products on the Products page first.";
+export const MSG_NO_SEARCH_KEY = "Lead search isn't set up on this server. Ask your admin to add the Firecrawl API key.";
+export const MSG_SEARCH_NEEDS_TEXT = "Tell me what leads to look for.";
+export const MSG_SEARCH_DOWN = "The web search didn't work just now. Please try again in a few minutes.";
+export const MSG_SEARCH_NO_CREDITS = "The lead search service has run out of credits for this month.";
+export const SCRAPE_DEADLINE_MS = 45_000;
 
 export function msgCantRun(kind: string): string {
   return `This agent can't run ${kind}.`;

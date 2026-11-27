@@ -20,7 +20,13 @@ const n = (r: Record<string, unknown> | null, k: string) => Number(r?.[k]) || 0;
 const plural = (x: number, one: string, many = `${one}s`) => `${x} ${x === 1 ? one : many}`;
 
 // The result line for a finished run.
+// A lead search: "N sources · N dropped · N leads" (01-prd.md §7.3).
+export function searchSummary(result: Record<string, unknown> | null): string {
+  return `${plural(n(result, "sources"), "source")} · ${n(result, "dropped")} dropped · ${plural(n(result, "leadsFound"), "lead")}`;
+}
+
 export function resultSummary(kind: string, result: Record<string, unknown> | null): string {
+  if (kind === "scrape") return searchSummary(result);
   const picked = n(result, "picked");
   if (!picked) return "No leads needed this";
   const parts: string[] = [];
@@ -57,7 +63,7 @@ export function toTask(j: JobRow): Task {
   let summary: string;
   if (j.status === "queued") summary = "Waiting to start";
   else if (j.status === "needs_approval") summary = "Waiting for your go-ahead";
-  else if (j.status === "running") summary = steps.find((s) => s.id === "work")?.label ?? "Working…";
+  else if (j.status === "running") summary = (j.kind === "scrape" ? steps[steps.length - 1] : steps.find((s) => s.id === "work"))?.label ?? "Working…";
   else if (j.status === "dismissed") summary = "Cancelled";
   else if (j.status === "failed") summary = j.error ?? "Failed";
   else summary = resultSummary(j.kind, j.result);

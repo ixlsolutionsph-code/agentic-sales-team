@@ -1552,3 +1552,18 @@ select.lp-input { appearance: auto; }
   .mail-list { max-height: 260px; }
   .emails-page .leads-filters .lp-input { width: 100%; }
 }
+
+/* ------------------------------------------------------------------
+   Lead search timeline (Milestone 8)
+   ------------------------------------------------------------------ */
+.scrape-wrap { display: grid; gap: 10px; }
+.scrape-card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); }
+.scrape-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.scrape-step { display: flex; gap: 12px; align-items: flex-start; }
+.scrape-item a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.scrape-item a:hover { text-decoration: underline; }
+.scrape-item.is-dropped, .scrape-item.is-dropped a { color: var(--text-muted); }
+.scrape-item.is-failed { color: var(--negative); }
+.scrape-summary { margin: 0; padding-top: 8px; border-top: 1px solid var(--gray-100); font-size: 14px; font-weight: 700; }
+.scrape-steps:empty { display: none; }
+.scrape-steps:empty + .scrape-summary { border-top: 0; padding-top: 0; }

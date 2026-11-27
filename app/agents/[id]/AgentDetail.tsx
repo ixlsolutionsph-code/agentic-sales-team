@@ -16,10 +16,11 @@ import type { Agent } from "@/lib/types";
 import { useAgentWork } from "@/lib/useAgentWork";
 import AgentConfigForm from "./AgentConfigForm";
 import { DraftList, ProposalList, RunButton, TaskList } from "./AgentWork";
+import FindLeads from "./FindLeads";
 
 // /agents/[id]: header, sticky section tabs, sections, Configuration.
-// Run buttons for qualify, research, outreach and proposals (Milestone 7);
-// Find leads comes with the lead search in Milestone 8.
+// Run buttons for qualify, research, outreach and proposals (Milestone 7)
+// and Find leads with its live timeline (Milestone 8).
 export default function AgentDetail({ id }: { id: string }) {
   const { agents, states, config } = useApp();
   const agent = visibleAgents(agents, states, config).find((a) => a.id === id);
@@ -148,7 +149,7 @@ function AgentView({ agent }: { agent: Agent }) {
 
       {has("scrape") || has("qualify") ? (
         <Section id="leads" title="Leads">
-          {has("scrape") ? <SubEmpty title="Find leads" text="No leads found yet." /> : null}
+          {has("scrape") ? <FindLeads agentId={agent.id} agentName={agent.name} tasks={work.tasks} disabled={paused} onChanged={reload} /> : null}
           {has("qualify") ? (
             <RunRow title="Qualify leads" text="Scores the team's accepted leads that have no score yet, 5 at a time.">
               <RunButton kind="qualify" label="Qualify leads" tasks={work.tasks} disabled={paused} run={run} />
